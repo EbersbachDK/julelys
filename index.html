@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Julelys-beregner</title>
+<meta name="description" content="Beregn og tegn ophæng af lyskæde på loftet — mønster, kroge, længde og nedhæng.">
+<meta name="theme-color" content="#f3f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10140f" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Julelys">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: beregner — kontrolpanel + live plantegning + nøgletal. Mørk/varm vinterpalet, ét guld-accentlys. */
+  :root {
+    --bg:#f3f1ea; --panel:#ffffff; --panel2:#f7f5ef; --ink:#1f2a24; --muted:#5e6b63;
+    --line:#dcd8cc; --green:#1f5137; --green-soft:#e4ede6; --gold:#c8912f; --gold-glow:#f2c15a;
+    --wall:#b9b2a1; --warn:#b4541f; --warn-soft:#f6e6da; --ok:#2f7d4f;
+    --display:"Fraunces",Georgia,serif; --body:"Hanken Grotesk",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#10140f; --panel:#19201a; --panel2:#141a14; --ink:#eef1e9; --muted:#9aa89b;
+      --line:#2b352b; --green:#4f9a6f; --green-soft:#1b271d; --gold:#e6b24d; --gold-glow:#ffd87a;
+      --wall:#3a4238; --warn:#e08a4e; --warn-soft:#2c2016; --ok:#5fb37e; color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#10140f; --panel:#19201a; --panel2:#141a14; --ink:#eef1e9; --muted:#9aa89b;
+    --line:#2b352b; --green:#4f9a6f; --green-soft:#1b271d; --gold:#e6b24d; --gold-glow:#ffd87a;
+    --wall:#3a4238; --warn:#e08a4e; --warn-soft:#2c2016; --ok:#5fb37e; color-scheme:dark;
+  }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--body); line-height:1.5; }
+  .wrap {
+    max-width: 920px; margin:0 auto;
+    padding-left:max(18px,env(safe-area-inset-left,0px));
+    padding-right:max(18px,env(safe-area-inset-right,0px));
+    padding-block:34px 56px;
+  }
+  header { margin-bottom:22px; }
+  .eyebrow { font-size:.72rem; letter-spacing:.22em; text-transform:uppercase; color:var(--gold); font-weight:600; margin:0 0 8px; }
+  h1 { font-family:var(--display); font-weight:600; font-size:clamp(1.9rem,6vw,2.7rem); line-height:1.05; margin:0 0 8px; text-wrap:balance; }
+  .lede { color:var(--muted); margin:0; max-width:54ch; }
+
+  .grid { display:grid; grid-template-columns: 320px 1fr; gap:20px; align-items:start; }
+  @media (max-width:720px){ .grid { grid-template-columns:1fr; } }
+
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:20px; }
+  .card h2 { font-family:var(--display); font-weight:600; font-size:1.15rem; margin:0 0 16px; }
+
+  .field { margin-bottom:18px; }
+  .field:last-child { margin-bottom:0; }
+  .field label { display:flex; justify-content:space-between; align-items:baseline; font-weight:600; font-size:.92rem; margin-bottom:8px; }
+  .field .val { font-family:var(--display); font-size:1.05rem; color:var(--green); font-variant-numeric:tabular-nums; }
+  input[type=range] { width:100%; accent-color:var(--green); height:22px; }
+  .stepper { display:flex; align-items:center; gap:8px; margin-top:8px; }
+  .stepper button { width:34px; height:34px; border:1px solid var(--line); background:var(--panel2); color:var(--ink); border-radius:9px; font-size:1.2rem; cursor:pointer; line-height:1; }
+  .stepper button:hover { border-color:var(--green); }
+  .stepper input { flex:1; min-width:0; text-align:center; font-family:var(--body); font-size:1rem; padding:7px; border:1px solid var(--line); border-radius:9px; background:var(--panel2); color:var(--ink); font-variant-numeric:tabular-nums; }
+  .unit { color:var(--muted); font-size:.85rem; }
+
+  .toggle { display:flex; flex-wrap:wrap; gap:4px; background:var(--green-soft); border-radius:14px; padding:4px; margin-top:4px; }
+  .toggle button { flex:1 1 40%; border:0; background:transparent; color:var(--muted); font-family:var(--body); font-size:.9rem; font-weight:600; padding:9px 8px; border-radius:10px; cursor:pointer; }
+  .toggle button[aria-pressed="true"] { background:var(--green); color:#fff; }
+  :root[data-theme="dark"] .toggle button[aria-pressed="true"],
+  :root:not([data-theme="light"]) .toggle button[aria-pressed="true"] { color:#0c110c; }
+  .hint { color:var(--muted); font-size:.82rem; margin:8px 2px 0; }
+
+  .vizwrap { display:flex; flex-direction:column; gap:20px; }
+  svg { width:100%; height:auto; display:block; }
+  .status { border-radius:12px; padding:11px 14px; font-size:.92rem; }
+  .status.ok { background:var(--green-soft); color:var(--green); }
+  .status.warn { background:var(--warn-soft); color:var(--warn); }
+  .status b { font-weight:700; }
+  .note2 { border-radius:12px; padding:10px 14px; font-size:.88rem; margin-top:10px; background:var(--warn-soft); color:var(--warn); }
+  .note2 b { font-weight:700; }
+  .statusbox { margin-bottom:14px; }
+
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  @media (max-width:520px){ .stats { grid-template-columns:repeat(2,1fr); } }
+  .stat { background:var(--panel2); border:1px solid var(--line); border-radius:13px; padding:13px 14px; }
+  .stat .n { font-family:var(--display); font-size:1.5rem; font-weight:600; line-height:1.05; font-variant-numeric:tabular-nums; }
+  .stat .n small { font-size:.85rem; font-weight:500; }
+  .stat .l { font-size:.78rem; color:var(--muted); margin-top:5px; }
+  .cap { color:var(--muted); font-size:.85rem; margin:0; }
+  footer { margin-top:26px; color:var(--muted); font-size:.82rem; }
+
+  .pdfbtn {
+    margin-top:14px; display:inline-flex; align-items:center; gap:8px;
+    background:var(--green); color:#fff; border:0; border-radius:11px;
+    font-family:var(--body); font-size:.95rem; font-weight:600;
+    padding:11px 18px; cursor:pointer;
+  }
+  :root[data-theme="dark"] .pdfbtn, :root:not([data-theme="light"]) .pdfbtn { color:#0c110c; }
+  .pdfbtn:hover { background:var(--gold); color:#1f2a24; }
+
+  #printhead { display:none; }
+  #printhead h1 { margin:0 0 4px; }
+  #printhead p { margin:0; color:var(--muted); }
+
+  @media print {
+    /* Tving lys palet uanset OS-tema, og bevar farverne i print */
+    :root, :root[data-theme="dark"], :root:not([data-theme="light"]) {
+      --bg:#ffffff; --panel:#ffffff; --panel2:#f7f5ef; --ink:#1f2a24; --muted:#5e6b63;
+      --line:#dcd8cc; --green:#1f5137; --green-soft:#e4ede6; --gold:#c8912f; --gold-glow:#f2c15a;
+      --wall:#b9b2a1; --warn:#b4541f; --warn-soft:#f6e6da; --ok:#2f7d4f; color-scheme:light;
+    }
+    @page { size:A4 portrait; margin:14mm; }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    body { background:#fff; }
+    .wrap { max-width:none; padding:0; }
+    header, #controls, .hint, .footerweb { display:none !important; }
+    #printhead { display:block !important; margin-bottom:16px; }
+    .grid { display:block; }
+    .vizwrap { gap:14px; }
+    .card { break-inside:avoid; }
+    .stats { grid-template-columns:repeat(4,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Beregner · loft</p>
+    <h1>Julelys-beregner</h1>
+    <p class="lede">Skriv rummets mål og kædens længde ind, vælg et mønster — så tegner og regner den ophænget, der bruger hele kæden.</p>
+    <button id="pdfBtn" class="pdfbtn" type="button">⤓ Gem plan som PDF</button>
+  </header>
+
+  <div id="printhead">
+    <p class="eyebrow">Monteringsplan · loft</p>
+    <h1>Julelys — plan</h1>
+    <p id="printsummary"></p>
+  </div>
+
+  <div class="grid">
+    <div class="card" id="controls">
+      <h2>Rummets størrelse</h2>
+
+      <div class="field">
+        <label for="rW">Bredde <span class="val" id="vW">1,0 m</span></label>
+        <input type="range" id="rW" min="0.3" max="6" step="0.1" value="1">
+        <div class="stepper">
+          <button data-t="W" data-d="-1" aria-label="mindre">−</button>
+          <input type="number" id="nW" min="0.3" max="6" step="0.1" value="1">
+          <button data-t="W" data-d="1" aria-label="mere">+</button>
+          <span class="unit">m</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="rL">Længde <span class="val" id="vL">4,0 m</span></label>
+        <input type="range" id="rL" min="1" max="15" step="0.1" value="4">
+        <div class="stepper">
+          <button data-t="L" data-d="-1" aria-label="mindre">−</button>
+          <input type="number" id="nL" min="1" max="15" step="0.1" value="4">
+          <button data-t="L" data-d="1" aria-label="mere">+</button>
+          <span class="unit">m</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="rC">Lyskædens længde <span class="val" id="vC">40 m</span></label>
+        <input type="range" id="rC" min="2" max="120" step="1" value="40">
+        <div class="stepper">
+          <button data-t="C" data-d="-1" aria-label="mindre">−</button>
+          <input type="number" id="nC" min="1" max="200" step="1" value="40">
+          <button data-t="C" data-d="1" aria-label="mere">+</button>
+          <span class="unit">m</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="rN">Antal LED-pærer <span class="val" id="vN">400</span></label>
+        <input type="range" id="rN" min="10" max="1200" step="10" value="400">
+        <div class="stepper">
+          <button data-t="N" data-d="-1" aria-label="færre">−</button>
+          <input type="number" id="nN" min="1" max="3000" step="10" value="400">
+          <button data-t="N" data-d="1" aria-label="flere">+</button>
+          <span class="unit">stk</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="rG">Nedhæng pr. stræk <span class="val" id="vG">10 cm</span></label>
+        <input type="range" id="rG" min="0" max="40" step="1" value="10">
+        <div class="stepper">
+          <button data-t="G" data-d="-1" aria-label="mindre">−</button>
+          <input type="number" id="nG" min="0" max="40" step="1" value="10">
+          <button data-t="G" data-d="1" aria-label="mere">+</button>
+          <span class="unit">cm</span>
+        </div>
+        <p class="hint">Hvor meget kæden hænger ned mod gulvet midt mellem krogene. Ses ikke ovenfra, men lægges til den krævede længde — se skitsen fra siden.</p>
+      </div>
+
+      <div class="field">
+        <label>Mønster</label>
+        <div class="toggle" role="group" aria-label="Vælg mønster">
+          <button data-mode="zig" aria-pressed="true">Zigzag</button>
+          <button data-mode="dia" aria-pressed="false">Diamant</button>
+          <button data-mode="snake" aria-pressed="false">Slange</button>
+          <button data-mode="spiral" aria-pressed="false">Spiral</button>
+        </div>
+        <p class="hint" id="hint"></p>
+      </div>
+    </div>
+
+    <div class="vizwrap">
+      <div class="card">
+        <h2>Plantegning <span class="unit" style="font-weight:400">· set ovenfra</span></h2>
+        <div class="statusbox">
+          <div id="status" class="status ok"></div>
+          <div id="note2" class="note2" hidden></div>
+        </div>
+        <svg id="plan" viewBox="-40 -30 480 200" role="img" aria-label="Plantegning af rummet med lyskæde"></svg>
+        <p class="cap" id="cap"></p>
+        <div id="sidewrap" hidden>
+          <h2 style="font-size:1rem;margin:18px 0 6px">Nedhæng <span class="unit" style="font-weight:400">· set fra siden</span></h2>
+          <svg id="side" viewBox="0 0 400 140" role="img" aria-label="Kæden set fra siden med nedhæng mellem to kroge"></svg>
+          <p class="cap">Lodret nedhæng mellem to kroge — det ses ikke ovenfra, men æder ekstra kæde.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Beregning</h2>
+        <div class="stats" id="stats"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Målene er cirka — juster afstanden lidt i hjørnerne, så det går pænt op. LED bliver ikke varme og må ligge tæt mod loft og væg.</footer>
+</div>
+
+<script>
+  const NS="http://www.w3.org/2000/svg";
+  const S = { W:1, L:4, C:40, N:400, G:10, mode:'zig' };
+  const STEP = { W:0.1, L:0.1, C:1, N:10, G:1 };
+  const MIN = { W:0.3, L:1, C:1, N:1, G:0 };
+  const MAX = { W:6, L:15, C:200, N:3000, G:40 };
+
+  const nf = (x,d=0)=> (isFinite(x)?x:0).toLocaleString('da-DK',{minimumFractionDigits:d,maximumFractionDigits:d});
+  const plen = pts => { let t=0; for(let i=0;i<pts.length-1;i++) t+=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]); return t; };
+
+  // Buet kædelinje (parabel): faktisk længde af et stræk med korde L0 og lodret nedhæng s midt på.
+  const arcLen = (L0,s)=>{ if(L0<=0) return 0; if(s<=0) return L0; const p=4*s/L0; return (L0/2)*(Math.sqrt(1+p*p)+Math.asinh(p)/p); };
+  const sagExtraOf = (spans,s)=>{ if(!spans||s<=0) return 0; let e=0; for(const L0 of spans) e+=arcLen(L0,s)-L0; return e; };
+  const segLens = pts => { const a=[]; for(let i=0;i<pts.length-1;i++) a.push(Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1])); return a; };
+
+  const HINTS = {
+    zig:   'Skråt frem og tilbage mellem de to langsider — klassisk og festligt.',
+    dia:   'To spejlvendte zigzag der krydser og danner ruder — roligere udtryk.',
+    snake: 'Lige baner på langs, der vender i enderne — jævnt lys over hele loftet.',
+    spiral:'Rammer ind mod midten — flot om en lampe eller midterpunkt i loftet.'
+  };
+  const MODE_LABEL = { zig:'Zigzag', dia:'Diamant', snake:'Slange', spiral:'Spiral' };
+  const CAPS = {
+    zig:   'Guld = kæden · grønne prikker = kroge.',
+    dia:   'To zigzag (guld + grøn) der krydser.',
+    snake: 'Guld = kæden · prikker = kroge langs banerne (ca. hver meter).',
+    spiral:'Rammer udefra og ind · prikker = kroge i hjørnerne.'
+  };
+
+  // ---------- ét zigzag-gennemløb med givet kæde-budget ----------
+  function computePass(W, L, budget){
+    const diagMin = Math.hypot(L, W);
+    if (budget < diagMin){
+      const a = Math.min(W, L);
+      const segLen = Math.hypot(W, a);
+      const n = Math.max(1, Math.floor(budget / segLen));
+      return { n, a, segLen, used:n*segLen, partial:true, reach:Math.min(L,n*a) };
+    }
+    const aIdeal = (L*W)/Math.sqrt(budget*budget - L*L);
+    let n = Math.max(1, Math.round(L/aIdeal));
+    let a = L/n, segLen = Math.hypot(W,a), used = n*segLen;
+    if (used > budget && n>1){ n--; a=L/n; segLen=Math.hypot(W,a); used=n*segLen; }
+    return { n, a, segLen, used, partial:false, reach:L };
+  }
+  const zPts = (n,a,W,startBottom)=>{ const p=[]; for(let i=0;i<=n;i++) p.push([i*a, (startBottom?(i%2===0):(i%2===1))?W:0]); return p; };
+
+  // ---------- mønster-beregninger ----------
+  function calcZig(W,L,C){
+    const p = computePass(W,L,C), pts = zPts(p.n,p.a,W,false);
+    return { shapes:[{points:pts,color:'var(--gold)'}], hooks:pts, used:p.used,
+      spacing:2*p.a*100, partial:p.partial, reach:p.reach, spans:Array(p.n).fill(p.segLen),
+      stats:[
+        {n:nf(p.n), l:'Skrå stræk'},
+        {n:nf(p.segLen,2)+'<small> m</small>', l:'Længde pr. stræk'},
+        {n:nf(p.n+1), l:'Kroge i alt'},
+        {n:nf(2*p.a*100,0)+'<small> cm</small>', l:'Afstand mellem kroge (pr. side)'},
+        {n:nf(p.a*100,0)+'<small> cm</small>', l:'Frem pr. tak'},
+      ]};
+  }
+  function calcDia(W,L,C){
+    const a=computePass(W,L,C/2), b=computePass(W,L,C/2);
+    const pa=zPts(a.n,a.a,W,false), pb=zPts(b.n,b.a,W,true);
+    const used=a.used+b.used;
+    return { shapes:[{points:pa,color:'var(--gold)'},{points:pb,color:'var(--green)'}],
+      hooks:pa.concat(pb), used, spacing:a.a*100, partial:a.partial&&b.partial, reach:a.reach,
+      spans:Array(a.n).fill(a.segLen).concat(Array(b.n).fill(b.segLen)),
+      stats:[
+        {n:nf(a.n+b.n), l:'Skrå stræk i alt'},
+        {n:nf(a.segLen,2)+'<small> m</small>', l:'Længde pr. stræk'},
+        {n:nf(pa.length+pb.length), l:'Kroge i alt'},
+        {n:nf(a.a*100,0)+'<small> cm</small>', l:'Afstand mellem kroge (pr. side)'},
+      ]};
+  }
+  function calcSnake(W,L,C){
+    let ch=null;
+    for(let r=1;r<=120;r++){ const s=W/r, total=r*L+(r-1)*s; if(total<=C) ch={r,s,total}; else break; }
+    if(!ch){ // selv én bane er for lang
+      const fl=Math.min(L,C), fseg=Math.max(1,Math.round(fl));
+      const pts=[[0,W/2],[fl,W/2]];
+      return { shapes:[{points:pts,color:'var(--gold)'}], hooks:pts, used:fl,
+        spacing:W*100, partial:true, reach:fl, spans:Array(fseg).fill(fl/fseg),
+        stats:[{n:'1',l:'Baner på langs'},{n:nf(fl,1)+'<small> m</small>',l:'Nået længde'},{n:'2',l:'Kroge i alt'}] };
+    }
+    const {r,s,total}=ch, pts=[], hooks=[];
+    for(let i=0;i<r;i++){ const y=s/2+i*s;
+      if(i%2===0){ pts.push([0,y],[L,y]); } else { pts.push([L,y],[0,y]); }
+      const seg=Math.max(1,Math.round(L)); for(let j=0;j<=seg;j++) hooks.push([L*j/seg,y]);
+    }
+    const seg2=Math.max(1,Math.round(L)), spans=[];
+    for(let i=0;i<r;i++) for(let j=0;j<seg2;j++) spans.push(L/seg2);
+    for(let i=0;i<r-1;i++) spans.push(s);
+    return { shapes:[{points:pts,color:'var(--gold)'}], hooks, used:total,
+      spacing:s*100, partial:false, reach:L, spans,
+      stats:[
+        {n:nf(r), l:'Baner på langs'},
+        {n:nf(L,1)+'<small> m</small>', l:'Banelængde'},
+        {n:nf(hooks.length), l:'Kroge i alt'},
+        {n:nf(s*100,0)+'<small> cm</small>', l:'Afstand mellem baner'},
+      ]};
+  }
+  function calcSpiral(W,L,C){
+    const m=Math.min(W,L);
+    let ch=null;
+    for(let k=1;k<=60;k++){
+      const d=m/(2*k); let total=0, ok=true;
+      for(let i=0;i<k;i++){ const li=L-2*i*d, wi=W-2*i*d; if(li<=0||wi<=0){ok=false;break;} total+=2*(li+wi); }
+      if(ok && total<=C) ch={k,d,total}; else if(ok && total>C) break;
+    }
+    if(!ch){ // ikke nok til én ring hele vejen rundt
+      const peri=[[0,0],[L,0],[L,W],[0,W],[0,0]];
+      // tegn delvist langs kanten, længde = C
+      let acc=0, out=[peri[0]];
+      for(let i=0;i<peri.length-1 && acc<C;i++){ const seg=Math.hypot(peri[i+1][0]-peri[i][0],peri[i+1][1]-peri[i][1]);
+        if(acc+seg<=C){ out.push(peri[i+1]); acc+=seg; }
+        else { const f=(C-acc)/seg; out.push([peri[i][0]+(peri[i+1][0]-peri[i][0])*f, peri[i][1]+(peri[i+1][1]-peri[i][1])*f]); acc=C; } }
+      return { shapes:[{points:out,color:'var(--gold)'}], hooks:[[0,0],[L,0],[L,W],[0,W]], used:C,
+        spacing:m*100, partial:true, reach:null, spans:segLens(out),
+        stats:[{n:'<1',l:'Ringe'},{n:nf(2*(L+W),1)+'<small> m</small>',l:'Yderste omkreds'},{n:'4',l:'Kroge (hjørner)'}] };
+    }
+    const {k,d,total}=ch, shapes=[], hooks=[], spans=[];
+    for(let i=0;i<k;i++){ const x0=i*d,y0=i*d,x1=L-i*d,y1=W-i*d, li=x1-x0, wi=y1-y0;
+      shapes.push({points:[[x0,y0],[x1,y0],[x1,y1],[x0,y1],[x0,y0]], color:i%2?'var(--green)':'var(--gold)'});
+      hooks.push([x0,y0],[x1,y0],[x1,y1],[x0,y1]);
+      spans.push(li,wi,li,wi);
+    }
+    return { shapes, hooks, used:total, spacing:d*100, partial:false, reach:L, spans,
+      stats:[
+        {n:nf(k), l:'Ringe (ind mod midten)'},
+        {n:nf(2*(L+W),1)+'<small> m</small>', l:'Yderste omkreds'},
+        {n:nf(4*k), l:'Kroge (hjørner)'},
+        {n:nf(d*100,0)+'<small> cm</small>', l:'Afstand mellem ringe'},
+      ]};
+  }
+  const CALC = { zig:calcZig, dia:calcDia, snake:calcSnake, spiral:calcSpiral };
+
+  // ---------- tegning ----------
+  const svg = document.getElementById('plan');
+  const el = (name,a)=>{const e=document.createElementNS(NS,name);for(const k in a)e.setAttribute(k,a[k]);return e;};
+  const clear = ()=>{ while(svg.firstChild) svg.removeChild(svg.firstChild); };
+  function dots(ptsScaled, nd){
+    if(nd<=0) return;
+    const segs=[]; let tot=0;
+    for(let i=0;i<ptsScaled.length-1;i++){ const dl=Math.hypot(ptsScaled[i+1][0]-ptsScaled[i][0],ptsScaled[i+1][1]-ptsScaled[i][1]); segs.push(dl); tot+=dl; }
+    if(tot<=0) return;
+    const step=tot/(nd+1); let target=step, acc=0, si=0;
+    for(let c=0;c<nd;c++){
+      while(si<segs.length && acc+segs[si]<target){ acc+=segs[si]; si++; }
+      if(si>=segs.length) break;
+      const f=(target-acc)/segs[si];
+      svg.appendChild(el('circle',{cx:(ptsScaled[si][0]+(ptsScaled[si+1][0]-ptsScaled[si][0])*f).toFixed(1),
+        cy:(ptsScaled[si][1]+(ptsScaled[si+1][1]-ptsScaled[si][1])*f).toFixed(1), r:1.2, fill:'var(--gold-glow)'}));
+      target+=step;
+    }
+  }
+  function draw(res, W, L, ledTotal){
+    clear();
+    const scale=400/Math.max(L,W), Lu=L*scale, Wu=W*scale;
+    svg.setAttribute('viewBox', `-38 -26 ${Lu+60} ${Wu+60}`);
+    svg.appendChild(el('rect',{x:0,y:0,width:Lu,height:Wu,rx:3,fill:'var(--green-soft)',stroke:'var(--wall)','stroke-width':2}));
+    const tb=el('text',{x:Lu/2,y:Wu+24,'text-anchor':'middle',fill:'var(--muted)','font-size':13,'font-family':'var(--body)'}); tb.textContent=nf(L,1)+' m'; svg.appendChild(tb);
+    const tl=el('text',{x:-16,y:Wu/2,'text-anchor':'middle',fill:'var(--muted)','font-size':13,'font-family':'var(--body)',transform:`rotate(-90 -16 ${Wu/2})`}); tl.textContent=nf(W,1)+' m'; svg.appendChild(tl);
+
+    const totalLen = res.used>0?res.used:1;
+    res.shapes.forEach(sh=>{
+      const pts=sh.points.map(([x,y])=>[x*scale,y*scale]);
+      const d=pts.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
+      svg.appendChild(el('path',{d,fill:'none',stroke:'var(--gold-glow)','stroke-width':6,'stroke-linejoin':'round','stroke-linecap':'round',opacity:.3}));
+      svg.appendChild(el('path',{d,fill:'none',stroke:sh.color,'stroke-width':2.4,'stroke-linejoin':'round','stroke-linecap':'round'}));
+      dots(pts, Math.round(ledTotal * plen(sh.points)/totalLen));
+    });
+    res.hooks.forEach(([x,y])=> svg.appendChild(el('circle',{cx:(x*scale).toFixed(1),cy:(y*scale).toFixed(1),r:3.2,fill:'var(--panel)',stroke:'var(--green)','stroke-width':2})));
+  }
+
+  // ---------- nedhæng set fra siden ----------
+  function drawSide(spans, sagM){
+    const wrap=document.getElementById('sidewrap'), s=document.getElementById('side');
+    while(s.firstChild) s.removeChild(s.firstChild);
+    if(!spans || !spans.length || sagM<=0){ wrap.hidden=true; return; }
+    wrap.hidden=false;
+    const rep = spans.reduce((a,b)=>a+b,0)/spans.length;          // repræsentativt stræk (gns.)
+    const x0=55, x1=345, yTop=30, span=x1-x0;
+    const ratio = rep>0 ? Math.min(0.6, sagM/rep) : 0.2;          // nedhæng / stræk
+    const dipPx = Math.max(8, Math.min(60, ratio*span));
+    const yMid  = yTop+dipPx, cY = yTop+2*dipPx;                  // bezier-ctrl så midten rammer yMid
+    // loft
+    s.appendChild(el('line',{x1:18,y1:yTop,x2:382,y2:yTop,stroke:'var(--wall)','stroke-width':2}));
+    const ct=el('text',{x:200,y:yTop-9,'text-anchor':'middle',fill:'var(--muted)','font-size':11,'font-family':'var(--body)'}); ct.textContent='loft'; s.appendChild(ct);
+    // kæde (glød + streg)
+    const d=`M${x0} ${yTop} Q200 ${cY.toFixed(1)} ${x1} ${yTop}`;
+    s.appendChild(el('path',{d,fill:'none',stroke:'var(--gold-glow)','stroke-width':7,'stroke-linecap':'round',opacity:.3}));
+    s.appendChild(el('path',{d,fill:'none',stroke:'var(--gold)','stroke-width':2.6,'stroke-linecap':'round'}));
+    // kroge
+    [x0,x1].forEach(x=> s.appendChild(el('circle',{cx:x,cy:yTop,r:3.4,fill:'var(--panel)',stroke:'var(--green)','stroke-width':2})));
+    // målpil for nedhæng
+    s.appendChild(el('line',{x1:200,y1:yTop,x2:200,y2:yMid.toFixed(1),stroke:'var(--muted)','stroke-width':1,'stroke-dasharray':'3 3'}));
+    const dt=el('text',{x:210,y:(yTop+yMid)/2+4,fill:'var(--ink)','font-size':11,'font-weight':600,'font-family':'var(--body)'}); dt.textContent='↕ '+nf(sagM*100,0)+' cm'; s.appendChild(dt);
+    // stræk-label
+    const spt=el('text',{x:200,y:(yTop+dipPx+26).toFixed(1),'text-anchor':'middle',fill:'var(--muted)','font-size':11,'font-family':'var(--body)'}); spt.textContent='stræk ≈ '+nf(rep,1)+' m'; s.appendChild(spt);
+  }
+
+  // ---------- opdatér ----------
+  function update(){
+    const { W, L, C, N, G, mode } = S;
+    const sagM = G/100;
+    // Fit mønsteret, træk nedhænget fra budgettet, og fit igen så hele kæden stadig passer.
+    let res = CALC[mode](W,L,C);
+    let sagExtra = sagExtraOf(res.spans, sagM);
+    if (sagM>0 && res.spans){
+      const eff = Math.max(MIN.C, C - sagExtra);
+      res = CALC[mode](W,L,eff);
+      sagExtra = sagExtraOf(res.spans, sagM);
+    }
+    const usedTotal = res.used + sagExtra;
+    draw(res, W, L, N);
+    drawSide(res.spans, sagM);
+
+    const leftover = C - usedTotal;
+    const ledGap = (C*100)/N, ledPerM = N/C;
+
+    // status
+    const st = document.getElementById('status');
+    if (res.partial){
+      st.className='status warn';
+      st.innerHTML = res.reach!=null
+        ? `<b>Kæden er for kort</b> — den når ca. ${nf(res.reach,1)} m af rummets ${nf(L,1)} m. Vælg en længere kæde eller et mindre rum.`
+        : `<b>Kæden er for kort</b> — den når ikke hele vejen rundt. Vælg en længere kæde.`;
+    } else if (leftover < -0.01){
+      st.className='status warn';
+      st.innerHTML = `Du mangler ca. <b>${nf(-leftover,1)} m</b> kæde — resten dækkes ikke.`;
+    } else {
+      st.className='status ok';
+      st.innerHTML = `Passer fint ✓ — bruger <b>${nf(usedTotal,1)} m</b> af kæden${leftover>0.1?`, ca. <b>${nf(leftover,1)} m</b> i overskud`:''}.`;
+    }
+
+    // "meget tæt"-besked
+    const n2 = document.getElementById('note2');
+    const sp = res.spacing;
+    if (!res.partial && sp < 7){
+      n2.hidden=false;
+      n2.innerHTML = `<b>Meget tæt</b> (kun ${nf(sp,0)} cm imellem) — lyset dækker næsten hele loftet. Prøv et andet mønster, en kortere kæde eller et større rum, hvis du vil have mere luft.`;
+    } else if (!res.partial && sp < 12){
+      n2.hidden=false;
+      n2.innerHTML = `Ret tæt (ca. ${nf(sp,0)} cm imellem) — fyldigt og festligt. Vil du have roligere, så vælg Diamant/Slange eller en kortere kæde.`;
+    } else {
+      n2.hidden=true;
+    }
+
+    document.getElementById('cap').textContent = CAPS[mode];
+
+    // nøgletal
+    const extra = [
+      {n:nf(ledGap,1)+'<small> cm</small>', l:'Afstand mellem pærer'},
+      {n:nf(ledPerM,1), l:'LED pr. meter'},
+    ];
+    if (sagM>0) extra.push({n:'+'+nf(sagExtra,1)+'<small> m</small>', l:'Ekstra pga. nedhæng'});
+    extra.push({n:nf(usedTotal,1)+'<small> m</small>', l:'Kæde brugt'});
+    extra.push({n:(leftover>=0?'+':'')+nf(leftover,1)+'<small> m</small>', l:leftover>=0?'Overskud':'Mangler'});
+    const stats = res.stats.concat(extra);
+    document.getElementById('stats').innerHTML = stats.map(s=>
+      `<div class="stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`).join('');
+
+    // opsummering til PDF/print-udgaven
+    document.getElementById('printsummary').innerHTML =
+      `Rum ${nf(L,1)} × ${nf(W,1)} m · Kæde ${nf(C,0)} m · ${nf(N,0)} LED · ${MODE_LABEL[mode]}` +
+      (sagM>0 ? ` · nedhæng ${nf(G,0)} cm` : '');
+  }
+
+  // ---------- inputs ----------
+  const clamp=(t,v)=> Math.min(MAX[t], Math.max(MIN[t], v));
+  function setVal(t,v){
+    v = clamp(t, Math.round(v*1000)/1000); S[t]=v;
+    const dec=(t==='W'||t==='L')?1:0;
+    const unit = t==='G'?' cm':((t==='W'||t==='L'||t==='C')?' m':'');
+    document.getElementById('v'+t).textContent = nf(v,dec)+unit;
+    const r=document.getElementById('r'+t), n=document.getElementById('n'+t);
+    if (r && document.activeElement!==r) r.value=v;
+    if (n && document.activeElement!==n) n.value=(t==='W'||t==='L')?v.toFixed(1):v;
+    update();
+  }
+  ['W','L','C','N','G'].forEach(t=>{
+    document.getElementById('r'+t).addEventListener('input', e=> setVal(t, parseFloat(e.target.value)));
+    document.getElementById('n'+t).addEventListener('input', e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) setVal(t,v); });
+  });
+  document.querySelectorAll('.stepper button').forEach(b=>
+    b.addEventListener('click', ()=> setVal(b.dataset.t, S[b.dataset.t] + parseInt(b.dataset.d)*STEP[b.dataset.t])));
+
+  const modeBtns = document.querySelectorAll('.toggle button');
+  modeBtns.forEach(b=> b.addEventListener('click', ()=>{
+    S.mode=b.dataset.mode;
+    modeBtns.forEach(x=> x.setAttribute('aria-pressed', x===b?'true':'false'));
+    document.getElementById('hint').textContent = HINTS[S.mode];
+    update();
+  }));
+
+  document.getElementById('pdfBtn').addEventListener('click', ()=> window.print());
+
+  document.getElementById('hint').textContent = HINTS[S.mode];
+  ['W','L','C','N','G'].forEach(t=> setVal(t, S[t]));
+</script>
+
+<script>
+  // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
+  const APP_VERSION = '1.0.0';
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () =>
+      navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));
+  }
+</script>
+</body>
+</html>
