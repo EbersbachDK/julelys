@@ -229,6 +229,16 @@
       </div>
 
       <div class="field">
+        <label>Pæretype <span class="val" id="vBulb">Klassisk</span></label>
+        <div class="toggle" id="bulbToggle" role="group" aria-label="Vælg pæretype">
+          <button data-lm="0.5" data-name="Mikro">Mikro</button>
+          <button data-lm="1.5" data-name="Klassisk" aria-pressed="true">Klassisk</button>
+          <button data-lm="5" data-name="Kraftig">Kraftig</button>
+        </div>
+        <p class="hint">Bruges til at anslå lysstyrken. <b>Mikro</b> = tynde tråd-/riskæder (~0,5 lm/pære), <b>Klassisk</b> = almindelig varm-hvid lyskæde (~1,5 lm), <b>Kraftig</b> = store pærer (~5 lm). Står der lumen på pakken: lumen ÷ antal pærer.</p>
+      </div>
+
+      <div class="field">
         <label for="rG">Nedhæng pr. stræk <span class="val" id="vG">10 cm</span></label>
         <input type="range" id="rG" min="0" max="40" step="1" value="10">
         <div class="stepper">
@@ -280,6 +290,12 @@
         <h2>Beregning</h2>
         <div class="stats" id="stats"></div>
       </div>
+      <div class="card">
+        <h2>Lysstyrke <span class="unit" style="font-weight:400">· vejledende</span></h2>
+        <div id="lightbadge" class="status ok" style="margin-bottom:14px"></div>
+        <div class="stats" id="lightstats"></div>
+        <p class="cap">Dekorationslys lyser i punkter og ikke jævnt, så tallet er et groft gennemsnit over fladen — ikke målt rumbelysning. Til sammenligning er brugslys i et rum typisk 100–300 lm/m².</p>
+      </div>
     </div>
   </div>
 
@@ -288,7 +304,7 @@
 
 <script>
   const NS="http://www.w3.org/2000/svg";
-  const S = { W:1, L:4, C:40, N:400, G:10, P:20, surface:'loft', mode:'zig', mid:false, calcBy:'kaede' };
+  const S = { W:1, L:4, C:40, N:400, G:10, P:20, bulb:1.5, surface:'loft', mode:'zig', mid:false, calcBy:'kaede' };
   const STEP = { W:0.1, L:0.1, C:1, N:10, G:1, P:1 };
   const MIN = { W:0.3, L:1, C:1, N:1, G:0, P:2 };
   const MAX = { W:20, L:20, C:200, N:3000, G:40, P:300 };
@@ -673,6 +689,35 @@
       `<table class="mtable"><thead><tr><th>Række</th><th>Højde fra gulv</th><th>Bredde (krog↔krog)</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
+  // ---------- lysstyrke (vejledende) ----------
+  // Bånd ud fra lumen pr. m² — dekorationslys, ikke brugslys.
+  const LIGHT_BANDS = [
+    { max:5,    word:'Diskret',        cls:'ok',   txt:'Kun et svagt skær — fint som fin detalje eller accent.' },
+    { max:20,   word:'Hyggelig',       cls:'ok',   txt:'Blødt stemningslys — hyggeligt om aftenen.' },
+    { max:60,   word:'Festligt',       cls:'ok',   txt:'Tydeligt, festligt lys der fylder fladen.' },
+    { max:150,  word:'Kraftigt',       cls:'warn', txt:'Meget lysende pynt — fylder godt i rummet.' },
+    { max:1e9,  word:'Meget kraftigt', cls:'warn', txt:'Nærmer sig rumbelysning — kan blive blændende som pynt.' }
+  ];
+  function lightInfo(W,L,N){
+    const area = Math.max(0.01, W*L);        // fladens areal (m²)
+    const ledPerM2 = N/area;
+    const totalLm = N*S.bulb;
+    const lmPerM2 = totalLm/area;
+    const band = LIGHT_BANDS.find(b=> lmPerM2 < b.max) || LIGHT_BANDS[LIGHT_BANDS.length-1];
+    const badge = document.getElementById('lightbadge');
+    badge.className = 'status '+band.cls;
+    badge.innerHTML = `<b>${band.word}</b> — ${band.txt} <span style="opacity:.8">(ca. ${nf(lmPerM2,0)} lm/m²)</span>`;
+    const ls = [
+      {n:nf(ledPerM2,0), l:'Pærer pr. m²'},
+      {n:nf(area,1)+'<small> m²</small>', l:'Fladens areal'},
+      {n:nf(totalLm,0)+'<small> lm</small>', l:'Samlet lysmængde'},
+      {n:nf(lmPerM2,0)+'<small> lm/m²</small>', l:'Lysmængde pr. m²'},
+    ];
+    document.getElementById('lightstats').innerHTML = ls.map(s=>
+      `<div class="stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`).join('');
+    return band;
+  }
+
   // ---------- opdatér ----------
   function update(){
     const { W, L, C, N, G, surface, mode } = S;
@@ -713,6 +758,7 @@
     draw(res, N);
     drawSide(res.spans, sagEff);
     treeGuide(res);
+    const lightBand = lightInfo(W, L, N);
 
     // I afstands-mode er den anbefalede kæde = forbruget; forudfyld kæde-feltet, så man kan skifte tilbage.
     const recommend = Math.ceil(usedTotal);              // vist anbefaling (ikke begrænset)
@@ -793,7 +839,8 @@
     document.getElementById('printsummary').innerHTML =
       `${dimTxt} · ${chainTxt} · ${nf(N,0)} LED · ${MODE_LABEL[mode]}` +
       (sagM>0 ? ` · nedhæng ${nf(G,0)} cm${mid?` (→ ${nf(G/4,1)} cm m. krog)`:''}` : '') +
-      (mid ? ' · krog midt på stræk' : '');
+      (mid ? ' · krog midt på stræk' : '') +
+      ` · lysstyrke: ${lightBand.word}`;
   }
 
   // ---------- inputs ----------
@@ -820,6 +867,12 @@
   function midApplicable(){ return S.W>=5 && MID_MODES.includes(S.mode); }
   document.querySelectorAll('#midToggle button').forEach(b=> b.addEventListener('click', ()=>{
     S.mid = b.dataset.mid==='1';
+    update();
+  }));
+  document.querySelectorAll('#bulbToggle button').forEach(b=> b.addEventListener('click', ()=>{
+    S.bulb = parseFloat(b.dataset.lm);
+    document.getElementById('vBulb').textContent = b.dataset.name;
+    document.querySelectorAll('#bulbToggle button').forEach(x=> x.setAttribute('aria-pressed', x===b?'true':'false'));
     update();
   }));
   function applyLabels(){
@@ -872,7 +925,7 @@
 
 <script>
   // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
-  const APP_VERSION = '1.5.0';
+  const APP_VERSION = '1.6.0';
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () =>
       navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));
