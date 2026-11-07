@@ -224,7 +224,7 @@
           <button data-mid="0" aria-pressed="true">Nej</button>
           <button data-mid="1" aria-pressed="false">Ja</button>
         </div>
-        <p class="hint">Ved brede stræk (fra 5 m) kan du sætte en ekstra krog midt på hvert skråt stræk. Det deler strækket i to kortere stræk (vist med ekstra prikker) — sæt gerne nedhænget lavere, når der er en midterkrog.</p>
+        <p class="hint">Ved brede stræk (fra 5 m) kan du sætte en ekstra krog midt på hvert skråt stræk. Det deler strækket i to (vist med ekstra prikker), så kæden hænger mindre dybt — nedhænget reduceres automatisk til ca. ¼.</p>
       </div>
     </div>
 
@@ -584,18 +584,22 @@
         x.setAttribute('aria-pressed', (x.dataset.mid==='1')===S.mid ? 'true':'false'));
     }
     const mid = canMid && S.mid;
+    // En midterkrog halverer strækket; nedhæng vokser med stræk², så støtten giver ~¼ nedhæng.
+    const sagEff = mid ? sagM/4 : sagM;
+    document.getElementById('vG').textContent = (mid && G>0)
+      ? `${nf(G,0)} cm → ${nf(G/4,1)} cm` : `${nf(G,0)} cm`;
     // Fit mønsteret, træk nedhænget fra budgettet, og fit igen så kæden passer.
     let res = CALC[mode](W,L,C,mid);
-    let sagExtra = sagExtraOf(res.spans, sagM);
-    if (sagM>0 && res.spans){
+    let sagExtra = sagExtraOf(res.spans, sagEff);
+    if (sagEff>0 && res.spans){
       const eff = Math.max(MIN.C, C - sagExtra);
       res = CALC[mode](W,L,eff,mid);
-      sagExtra = sagExtraOf(res.spans, sagM);
+      sagExtra = sagExtraOf(res.spans, sagEff);
     }
     if (!res.domain) res.domain = {w:L, h:W};   // loft-mønstrene: x=længde, y=bredde
     const usedTotal = res.used + sagExtra;
     draw(res, N);
-    drawSide(res.spans, sagM);
+    drawSide(res.spans, sagEff);
 
     const leftover = C - usedTotal;
     const ledGap = (C*100)/N, ledPerM = N/C;
@@ -649,7 +653,7 @@
       : `Rum ${nf(L,1)} × ${nf(W,1)} m`;
     document.getElementById('printsummary').innerHTML =
       `${dimTxt} · Kæde ${nf(C,0)} m · ${nf(N,0)} LED · ${MODE_LABEL[mode]}` +
-      (sagM>0 ? ` · nedhæng ${nf(G,0)} cm` : '') +
+      (sagM>0 ? ` · nedhæng ${nf(G,0)} cm${mid?` (→ ${nf(G/4,1)} cm m. krog)`:''}` : '') +
       (mid ? ' · krog midt på stræk' : '');
   }
 
@@ -716,7 +720,7 @@
 
 <script>
   // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
-  const APP_VERSION = '1.2.0';
+  const APP_VERSION = '1.3.0';
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () =>
       navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));
