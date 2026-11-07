@@ -158,10 +158,10 @@
 
       <div class="field">
         <label for="rW"><span id="lblW">Bredde</span> <span class="val" id="vW">1,0 m</span></label>
-        <input type="range" id="rW" min="0.3" max="6" step="0.1" value="1">
+        <input type="range" id="rW" min="0.3" max="20" step="0.1" value="1">
         <div class="stepper">
           <button data-t="W" data-d="-1" aria-label="mindre">−</button>
-          <input type="number" id="nW" min="0.3" max="6" step="0.1" value="1">
+          <input type="number" id="nW" min="0.3" max="20" step="0.1" value="1">
           <button data-t="W" data-d="1" aria-label="mere">+</button>
           <span class="unit">m</span>
         </div>
@@ -169,10 +169,10 @@
 
       <div class="field">
         <label for="rL"><span id="lblL">Længde</span> <span class="val" id="vL">4,0 m</span></label>
-        <input type="range" id="rL" min="1" max="15" step="0.1" value="4">
+        <input type="range" id="rL" min="1" max="20" step="0.1" value="4">
         <div class="stepper">
           <button data-t="L" data-d="-1" aria-label="mindre">−</button>
-          <input type="number" id="nL" min="1" max="15" step="0.1" value="4">
+          <input type="number" id="nL" min="1" max="20" step="0.1" value="4">
           <button data-t="L" data-d="1" aria-label="mere">+</button>
           <span class="unit">m</span>
         </div>
@@ -217,6 +217,15 @@
         <div class="toggle" id="modeToggle" role="group" aria-label="Vælg mønster"></div>
         <p class="hint" id="hint"></p>
       </div>
+
+      <div class="field" id="midField" hidden>
+        <label>Krog midt på trækket <span class="val" id="vMid">Nej</span></label>
+        <div class="toggle" id="midToggle" role="group" aria-label="Krog i midten af trækket">
+          <button data-mid="0" aria-pressed="true">Nej</button>
+          <button data-mid="1" aria-pressed="false">Ja</button>
+        </div>
+        <p class="hint">Ved brede stræk (fra 5 m) kan du sætte en ekstra krog midt på hvert skråt stræk. Det deler strækket i to kortere stræk (vist med ekstra prikker) — sæt gerne nedhænget lavere, når der er en midterkrog.</p>
+      </div>
     </div>
 
     <div class="vizwrap">
@@ -246,10 +255,10 @@
 
 <script>
   const NS="http://www.w3.org/2000/svg";
-  const S = { W:1, L:4, C:40, N:400, G:10, surface:'loft', mode:'zig' };
+  const S = { W:1, L:4, C:40, N:400, G:10, surface:'loft', mode:'zig', mid:false };
   const STEP = { W:0.1, L:0.1, C:1, N:10, G:1 };
   const MIN = { W:0.3, L:1, C:1, N:1, G:0 };
-  const MAX = { W:6, L:15, C:200, N:3000, G:40 };
+  const MAX = { W:20, L:20, C:200, N:3000, G:40 };
 
   const nf = (x,d=0)=> (isFinite(x)?x:0).toLocaleString('da-DK',{minimumFractionDigits:d,maximumFractionDigits:d});
   const plen = pts => { let t=0; for(let i=0;i<pts.length-1;i++) t+=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]); return t; };
@@ -258,6 +267,8 @@
   const arcLen = (L0,s)=>{ if(L0<=0) return 0; if(s<=0) return L0; const p=4*s/L0; return (L0/2)*(Math.sqrt(1+p*p)+Math.asinh(p)/p); };
   const sagExtraOf = (spans,s)=>{ if(!spans||s<=0) return 0; let e=0; for(const L0 of spans) e+=arcLen(L0,s)-L0; return e; };
   const segLens = pts => { const a=[]; for(let i=0;i<pts.length-1;i++) a.push(Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1])); return a; };
+  // Midtpunkter på hvert stræk (til ekstra krog midt på trækket).
+  const midpoints = pts => { const m=[]; for(let i=0;i<pts.length-1;i++) m.push([(pts[i][0]+pts[i+1][0])/2,(pts[i][1]+pts[i+1][1])/2]); return m; };
   // Klip en sti af ved en given længde (til "kæden rækker kun hertil").
   function truncate(pts, budget){
     let acc=0; const out=[pts[0]];
@@ -316,29 +327,34 @@
   const zPts = (n,a,W,startBottom)=>{ const p=[]; for(let i=0;i<=n;i++) p.push([i*a, (startBottom?(i%2===0):(i%2===1))?W:0]); return p; };
 
   // ---------- mønster-beregninger ----------
-  function calcZig(W,L,C){
+  function calcZig(W,L,C,mid){
     const p = computePass(W,L,C), pts = zPts(p.n,p.a,W,false);
-    return { shapes:[{points:pts,color:'var(--gold)'}], hooks:pts, used:p.used,
-      spacing:2*p.a*100, partial:p.partial, reach:p.reach, spans:Array(p.n).fill(p.segLen),
+    let hooks=pts, spans=Array(p.n).fill(p.segLen);
+    if(mid){ hooks=pts.concat(midpoints(pts)); spans=Array(p.n*2).fill(p.segLen/2); }
+    return { shapes:[{points:pts,color:'var(--gold)'}], hooks, used:p.used,
+      spacing:2*p.a*100, partial:p.partial, reach:p.reach, spans,
       stats:[
         {n:nf(p.n), l:'Skrå stræk'},
         {n:nf(p.segLen,2)+'<small> m</small>', l:'Længde pr. stræk'},
-        {n:nf(p.n+1), l:'Kroge i alt'},
+        {n:nf(hooks.length), l:'Kroge i alt'+(mid?' (m. midterkrog)':'')},
         {n:nf(2*p.a*100,0)+'<small> cm</small>', l:'Afstand mellem kroge (pr. side)'},
         {n:nf(p.a*100,0)+'<small> cm</small>', l:'Frem pr. tak'},
       ]};
   }
-  function calcDia(W,L,C){
+  function calcDia(W,L,C,mid){
     const a=computePass(W,L,C/2), b=computePass(W,L,C/2);
     const pa=zPts(a.n,a.a,W,false), pb=zPts(b.n,b.a,W,true);
     const used=a.used+b.used;
+    let hooks=pa.concat(pb);
+    let spans=Array(a.n).fill(a.segLen).concat(Array(b.n).fill(b.segLen));
+    if(mid){ hooks=pa.concat(pb, midpoints(pa), midpoints(pb));
+      spans=Array(a.n*2).fill(a.segLen/2).concat(Array(b.n*2).fill(b.segLen/2)); }
     return { shapes:[{points:pa,color:'var(--gold)'},{points:pb,color:'var(--green)'}],
-      hooks:pa.concat(pb), used, spacing:a.a*100, partial:a.partial&&b.partial, reach:a.reach,
-      spans:Array(a.n).fill(a.segLen).concat(Array(b.n).fill(b.segLen)),
+      hooks, used, spacing:a.a*100, partial:a.partial&&b.partial, reach:a.reach, spans,
       stats:[
         {n:nf(a.n+b.n), l:'Skrå stræk i alt'},
         {n:nf(a.segLen,2)+'<small> m</small>', l:'Længde pr. stræk'},
-        {n:nf(pa.length+pb.length), l:'Kroge i alt'},
+        {n:nf(hooks.length), l:'Kroge i alt'+(mid?' (m. midterkrog)':'')},
         {n:nf(a.a*100,0)+'<small> cm</small>', l:'Afstand mellem kroge (pr. side)'},
       ]};
   }
@@ -434,16 +450,18 @@
       ]};
   }
   // ---------- væg: zigzag ned ad væggen ----------
-  function calcWallZig(W,L,C){
+  function calcWallZig(W,L,C,mid){
     const p=computePass(W,L,C), pts=[];
     for(let i=0;i<=p.n;i++) pts.push([ (i%2===0?0:W), i*p.a ]);
-    return { shapes:[{points:pts,color:'var(--gold)'}], hooks:pts, used:p.used,
-      spacing:2*p.a*100, partial:p.partial, reach:p.reach, spans:Array(p.n).fill(p.segLen),
+    let hooks=pts, spans=Array(p.n).fill(p.segLen);
+    if(mid){ hooks=pts.concat(midpoints(pts)); spans=Array(p.n*2).fill(p.segLen/2); }
+    return { shapes:[{points:pts,color:'var(--gold)'}], hooks, used:p.used,
+      spacing:2*p.a*100, partial:p.partial, reach:p.reach, spans,
       domain:{w:W,h:L}, ground:true,
       stats:[
         {n:nf(p.n), l:'Skrå stræk'},
         {n:nf(p.segLen,2)+'<small> m</small>', l:'Længde pr. stræk'},
-        {n:nf(p.n+1), l:'Kroge i alt'},
+        {n:nf(hooks.length), l:'Kroge i alt'+(mid?' (m. midterkrog)':'')},
         {n:nf(p.a*100,0)+'<small> cm</small>', l:'Ned pr. tak'},
       ]};
   }
@@ -557,12 +575,21 @@
   function update(){
     const { W, L, C, N, G, surface, mode } = S;
     const sagM = G/100;
+    // "Krog midt på trækket" — kun relevant for brede, skrå stræk (fra 5 m)
+    const canMid = midApplicable();
+    document.getElementById('midField').hidden = !canMid;
+    if (canMid){
+      document.getElementById('vMid').textContent = S.mid ? 'Ja' : 'Nej';
+      document.querySelectorAll('#midToggle button').forEach(x=>
+        x.setAttribute('aria-pressed', (x.dataset.mid==='1')===S.mid ? 'true':'false'));
+    }
+    const mid = canMid && S.mid;
     // Fit mønsteret, træk nedhænget fra budgettet, og fit igen så kæden passer.
-    let res = CALC[mode](W,L,C);
+    let res = CALC[mode](W,L,C,mid);
     let sagExtra = sagExtraOf(res.spans, sagM);
     if (sagM>0 && res.spans){
       const eff = Math.max(MIN.C, C - sagExtra);
-      res = CALC[mode](W,L,eff);
+      res = CALC[mode](W,L,eff,mid);
       sagExtra = sagExtraOf(res.spans, sagM);
     }
     if (!res.domain) res.domain = {w:L, h:W};   // loft-mønstrene: x=længde, y=bredde
@@ -622,7 +649,8 @@
       : `Rum ${nf(L,1)} × ${nf(W,1)} m`;
     document.getElementById('printsummary').innerHTML =
       `${dimTxt} · Kæde ${nf(C,0)} m · ${nf(N,0)} LED · ${MODE_LABEL[mode]}` +
-      (sagM>0 ? ` · nedhæng ${nf(G,0)} cm` : '');
+      (sagM>0 ? ` · nedhæng ${nf(G,0)} cm` : '') +
+      (mid ? ' · krog midt på stræk' : '');
   }
 
   // ---------- inputs ----------
@@ -645,6 +673,12 @@
     b.addEventListener('click', ()=> setVal(b.dataset.t, S[b.dataset.t] + parseInt(b.dataset.d)*STEP[b.dataset.t])));
 
   // ---------- flade + mønster ----------
+  const MID_MODES = ['zig','dia','wzig'];
+  function midApplicable(){ return S.W>=5 && MID_MODES.includes(S.mode); }
+  document.querySelectorAll('#midToggle button').forEach(b=> b.addEventListener('click', ()=>{
+    S.mid = b.dataset.mid==='1';
+    update();
+  }));
   function applyLabels(){
     const s = SURFACES[S.surface];
     document.getElementById('sizeTitle').textContent = s.title;
@@ -682,7 +716,7 @@
 
 <script>
   // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
-  const APP_VERSION = '1.1.0';
+  const APP_VERSION = '1.2.0';
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () =>
       navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));
