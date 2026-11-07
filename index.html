@@ -186,6 +186,15 @@
       </div>
 
       <div class="field">
+        <label>Beregn ud fra</label>
+        <div class="toggle" id="calcToggle" role="group" aria-label="Vælg hvad beregningen styres af">
+          <button data-calc="kaede" aria-pressed="true">Kædelængde</button>
+          <button data-calc="afstand" aria-pressed="false">Afstand</button>
+        </div>
+        <p class="hint">Vælg <b>Afstand</b> for selv at bestemme afstanden mellem krogene — så låser den op og regner ud, hvor lang en lyskæde du skal bruge.</p>
+      </div>
+
+      <div class="field" id="fieldC">
         <label for="rC">Lyskædens længde <span class="val" id="vC">40 m</span></label>
         <input type="range" id="rC" min="2" max="120" step="1" value="40">
         <div class="stepper">
@@ -194,6 +203,18 @@
           <button data-t="C" data-d="1" aria-label="mere">+</button>
           <span class="unit">m</span>
         </div>
+      </div>
+
+      <div class="field" id="fieldP" hidden>
+        <label for="rP"><span id="lblP">Afstand mellem kroge</span> <span class="val" id="vP">20 cm</span></label>
+        <input type="range" id="rP" min="2" max="150" step="1" value="20">
+        <div class="stepper">
+          <button data-t="P" data-d="-1" aria-label="mindre">−</button>
+          <input type="number" id="nP" min="2" max="300" step="1" value="20">
+          <button data-t="P" data-d="1" aria-label="mere">+</button>
+          <span class="unit">cm</span>
+        </div>
+        <p class="hint">Den afstand du ønsker mellem krogene. Resten tilpasses, og den anbefalede kædelængde vises i beregningen.</p>
       </div>
 
       <div class="field">
@@ -267,10 +288,10 @@
 
 <script>
   const NS="http://www.w3.org/2000/svg";
-  const S = { W:1, L:4, C:40, N:400, G:10, surface:'loft', mode:'zig', mid:false };
-  const STEP = { W:0.1, L:0.1, C:1, N:10, G:1 };
-  const MIN = { W:0.3, L:1, C:1, N:1, G:0 };
-  const MAX = { W:20, L:20, C:200, N:3000, G:40 };
+  const S = { W:1, L:4, C:40, N:400, G:10, P:20, surface:'loft', mode:'zig', mid:false, calcBy:'kaede' };
+  const STEP = { W:0.1, L:0.1, C:1, N:10, G:1, P:1 };
+  const MIN = { W:0.3, L:1, C:1, N:1, G:0, P:2 };
+  const MAX = { W:20, L:20, C:200, N:3000, G:40, P:300 };
 
   const nf = (x,d=0)=> (isFinite(x)?x:0).toLocaleString('da-DK',{minimumFractionDigits:d,maximumFractionDigits:d});
   const plen = pts => { let t=0; for(let i=0;i<pts.length-1;i++) t+=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]); return t; };
@@ -305,6 +326,26 @@
     zig:'Zigzag', dia:'Diamant', snake:'Slange', spiral:'Spiral',
     tree:'Juletræ', wzig:'Zigzag', curtain:'Gardin'
   };
+  // Afstands-mode: hvad afstanden hedder, og hvordan den omsættes til antal (stræk/baner/ringe/rækker/strenge).
+  const SPACING_LABEL = {
+    zig:'Afstand mellem kroge', dia:'Afstand mellem kroge', wzig:'Afstand mellem kroge',
+    snake:'Afstand mellem baner', spiral:'Afstand mellem ringe',
+    tree:'Afstand mellem rækker', curtain:'Afstand mellem strenge'
+  };
+  const SPACING_WORD = {
+    zig:'kroge', dia:'kroge', wzig:'kroge',
+    snake:'baner', spiral:'ringe', tree:'rækker', curtain:'strenge'
+  };
+  // P i cm -> antal (afrundes og clampes i update)
+  const countFromSpacing = {
+    zig:   (W,L,P)=> 200*L/P,
+    dia:   (W,L,P)=> 100*L/P,
+    wzig:  (W,L,P)=> 200*L/P,
+    snake: (W,L,P)=> 100*W/P,
+    curtain:(W,L,P)=> 100*W/P,
+    spiral:(W,L,P)=> 50*Math.min(W,L)/P,
+    tree:  (W,L,P)=> 100*L/P
+  };
   const CAPS = {
     zig:   'Guld = kæden · grønne prikker = kroge.',
     dia:   'To zigzag (guld + grøn) der krydser.',
@@ -337,10 +378,13 @@
     return { n, a, segLen, used, partial:false, reach:L };
   }
   const zPts = (n,a,W,startBottom)=>{ const p=[]; for(let i=0;i<=n;i++) p.push([i*a, (startBottom?(i%2===0):(i%2===1))?W:0]); return p; };
+  // Afstands-mode: byg samme pass-objekt ud fra et fast antal stræk (ingen budget-grænse → aldrig partial).
+  const forcedPass = (W,L,n)=>{ n=Math.max(1,Math.round(n)); const a=L/n, segLen=Math.hypot(W,a); return { n, a, segLen, used:n*segLen, partial:false, reach:L }; };
 
   // ---------- mønster-beregninger ----------
-  function calcZig(W,L,C,mid){
-    const p = computePass(W,L,C), pts = zPts(p.n,p.a,W,false);
+  function calcZig(W,L,C,mid,forceN){
+    const p = forceN ? forcedPass(W,L,forceN) : computePass(W,L,C);
+    const pts = zPts(p.n,p.a,W,false);
     let hooks=pts, spans=Array(p.n).fill(p.segLen);
     if(mid){ hooks=pts.concat(midpoints(pts)); spans=Array(p.n*2).fill(p.segLen/2); }
     return { shapes:[{points:pts,color:'var(--gold)'}], hooks, used:p.used,
@@ -353,8 +397,9 @@
         {n:nf(p.a*100,0)+'<small> cm</small>', l:'Frem pr. tak'},
       ]};
   }
-  function calcDia(W,L,C,mid){
-    const a=computePass(W,L,C/2), b=computePass(W,L,C/2);
+  function calcDia(W,L,C,mid,forceN){
+    const a = forceN ? forcedPass(W,L,forceN) : computePass(W,L,C/2);
+    const b = forceN ? forcedPass(W,L,forceN) : computePass(W,L,C/2);
     const pa=zPts(a.n,a.a,W,false), pb=zPts(b.n,b.a,W,true);
     const used=a.used+b.used;
     let hooks=pa.concat(pb);
@@ -370,9 +415,10 @@
         {n:nf(a.a*100,0)+'<small> cm</small>', l:'Afstand mellem kroge (pr. side)'},
       ]};
   }
-  function calcSnake(W,L,C){
+  function calcSnake(W,L,C,mid,forceN){
     let ch=null;
-    for(let r=1;r<=120;r++){ const s=W/r, total=r*L+(r-1)*s; if(total<=C) ch={r,s,total}; else break; }
+    if(forceN){ const r=Math.max(1,Math.round(forceN)), s=W/r; ch={r,s,total:r*L+(r-1)*s}; }
+    else for(let r=1;r<=120;r++){ const s=W/r, total=r*L+(r-1)*s; if(total<=C) ch={r,s,total}; else break; }
     if(!ch){ // selv én bane er for lang
       const fl=Math.min(L,C), fseg=Math.max(1,Math.round(fl));
       const pts=[[0,W/2],[fl,W/2]];
@@ -397,10 +443,12 @@
         {n:nf(s*100,0)+'<small> cm</small>', l:'Afstand mellem baner'},
       ]};
   }
-  function calcSpiral(W,L,C){
+  function calcSpiral(W,L,C,mid,forceN){
     const m=Math.min(W,L);
     let ch=null;
-    for(let k=1;k<=60;k++){
+    if(forceN){ const k=Math.max(1,Math.round(forceN)), d=m/(2*k); let total=0;
+      for(let i=0;i<k;i++){ const li=L-2*i*d, wi=W-2*i*d; total+=2*(li+wi); } ch={k,d,total}; }
+    else for(let k=1;k<=60;k++){
       const d=m/(2*k); let total=0, ok=true;
       for(let i=0;i<k;i++){ const li=L-2*i*d, wi=W-2*i*d; if(li<=0||wi<=0){ok=false;break;} total+=2*(li+wi); }
       if(ok && total<=C) ch={k,d,total}; else if(ok && total>C) break;
@@ -437,9 +485,10 @@
       if(i%2===1) p.push([lft,y],[rgt,y]); else p.push([rgt,y],[lft,y]); }
     return p;
   }
-  function calcTree(W,L,C){
+  function calcTree(W,L,C,mid,forceN){
     let best=null;
-    for(let r=1;r<=60;r++){ const pts=treePts(W,L,r), len=plen(pts);
+    if(forceN){ const r=Math.max(1,Math.round(forceN)), pts=treePts(W,L,r); best={r,pts,len:plen(pts)}; }
+    else for(let r=1;r<=60;r++){ const pts=treePts(W,L,r), len=plen(pts);
       if(len<=C) best={r,pts,len}; else break; }
     if(!best){ // kæden kan ikke engang tegne træets omrids
       const t=truncate(treePts(W,L,1), C);
@@ -463,8 +512,9 @@
       ]};
   }
   // ---------- væg: zigzag ned ad væggen ----------
-  function calcWallZig(W,L,C,mid){
-    const p=computePass(W,L,C), pts=[];
+  function calcWallZig(W,L,C,mid,forceN){
+    const p = forceN ? forcedPass(W,L,forceN) : computePass(W,L,C);
+    const pts=[];
     for(let i=0;i<=p.n;i++) pts.push([ (i%2===0?0:W), i*p.a ]);
     let hooks=pts, spans=Array(p.n).fill(p.segLen);
     if(mid){ hooks=pts.concat(midpoints(pts)); spans=Array(p.n*2).fill(p.segLen/2); }
@@ -479,9 +529,10 @@
       ]};
   }
   // ---------- væg: gardin (lodrette strenge) ----------
-  function calcCurtain(W,L,C){
+  function calcCurtain(W,L,C,mid,forceN){
     let ch=null;
-    for(let k=1;k<=120;k++){ const s=W/k, total=k*L+(k-1)*s; if(total<=C) ch={k,s,total}; else break; }
+    if(forceN){ const k=Math.max(1,Math.round(forceN)), s=W/k; ch={k,s,total:k*L+(k-1)*s}; }
+    else for(let k=1;k<=120;k++){ const s=W/k, total=k*L+(k-1)*s; if(total<=C) ch={k,s,total}; else break; }
     if(!ch){
       const fl=Math.min(L,C), fseg=Math.max(1,Math.round(fl));
       const pts=[[W/2,0],[W/2,fl]];
@@ -639,13 +690,23 @@
     const sagEff = mid ? sagM/4 : sagM;
     document.getElementById('vG').textContent = (mid && G>0)
       ? `${nf(G,0)} cm → ${nf(G/4,1)} cm` : `${nf(G,0)} cm`;
-    // Fit mønsteret, træk nedhænget fra budgettet, og fit igen så kæden passer.
-    let res = CALC[mode](W,L,C,mid);
-    let sagExtra = sagExtraOf(res.spans, sagEff);
-    if (sagEff>0 && res.spans){
-      const eff = Math.max(MIN.C, C - sagExtra);
-      res = CALC[mode](W,L,eff,mid);
+    const byDist = S.calcBy==='afstand';
+    let res, sagExtra;
+    if (byDist){
+      // Afstands-mode: fast antal udledt af ønsket afstand → anbefal kædelængde (aldrig partial).
+      let n = countFromSpacing[mode](W,L,S.P);
+      n = Math.max(1, Math.min(400, Math.round(n)));
+      res = CALC[mode](W,L,0,mid,n);
       sagExtra = sagExtraOf(res.spans, sagEff);
+    } else {
+      // Kædelængde-mode: fit mønsteret, træk nedhænget fra budgettet, og fit igen så kæden passer.
+      res = CALC[mode](W,L,C,mid);
+      sagExtra = sagExtraOf(res.spans, sagEff);
+      if (sagEff>0 && res.spans){
+        const eff = Math.max(MIN.C, C - sagExtra);
+        res = CALC[mode](W,L,eff,mid);
+        sagExtra = sagExtraOf(res.spans, sagEff);
+      }
     }
     if (!res.domain) res.domain = {w:L, h:W};   // loft-mønstrene: x=længde, y=bredde
     const usedTotal = res.used + sagExtra;
@@ -653,13 +714,29 @@
     drawSide(res.spans, sagEff);
     treeGuide(res);
 
+    // I afstands-mode er den anbefalede kæde = forbruget; forudfyld kæde-feltet, så man kan skifte tilbage.
+    const recommend = Math.ceil(usedTotal);              // vist anbefaling (ikke begrænset)
+    if (byDist){
+      const prefill = Math.min(MAX.C, recommend);         // feltet kan kun rumme op til MAX.C
+      S.C = prefill;
+      document.getElementById('vC').textContent = nf(prefill,0)+' m';
+      const rC=document.getElementById('rC'), nC=document.getElementById('nC');
+      if (document.activeElement!==rC) rC.value=prefill;
+      if (document.activeElement!==nC) nC.value=prefill;
+    }
+
+    const chainBase = byDist ? usedTotal : C;        // grundlag for LED-tæthed
     const leftover = C - usedTotal;
-    const ledGap = (C*100)/N, ledPerM = N/C;
+    const ledGap = (chainBase*100)/N, ledPerM = N/chainBase;
     const flade = surface==='vaeg' ? 'væggen' : 'loftet';
 
     // status
     const st = document.getElementById('status');
-    if (res.partial){
+    if (byDist){
+      st.className='status ok';
+      st.innerHTML = `Med <b>${nf(S.P,0)} cm</b> mellem ${SPACING_WORD[mode]} skal du bruge ca. <b>${nf(usedTotal,1)} m</b> lyskæde` +
+        (sagM>0 ? ` (inkl. nedhæng)` : ``) + ` — køb mindst <b>${nf(recommend,0)} m</b>.`;
+    } else if (res.partial){
       st.className='status warn';
       st.innerHTML = res.reach!=null
         ? `<b>Kæden er for kort</b> — den når ca. ${nf(res.reach,1)} m. Vælg en længere kæde eller et mindre mønster.`
@@ -675,7 +752,9 @@
     // "meget tæt"-besked
     const n2 = document.getElementById('note2');
     const sp = res.spacing;
-    if (!res.partial && sp < 7){
+    if (byDist){
+      n2.hidden=true;
+    } else if (!res.partial && sp < 7){
       n2.hidden=false;
       n2.innerHTML = `<b>Meget tæt</b> (kun ${nf(sp,0)} cm imellem) — lyset dækker næsten hele ${flade}. Prøv et andet mønster, en kortere kæde eller et større område, hvis du vil have mere luft.`;
     } else if (!res.partial && sp < 12){
@@ -693,8 +772,13 @@
       {n:nf(ledPerM,1), l:'LED pr. meter'},
     ];
     if (sagM>0) extra.push({n:'+'+nf(sagExtra,1)+'<small> m</small>', l:'Ekstra pga. nedhæng'});
-    extra.push({n:nf(usedTotal,1)+'<small> m</small>', l:'Kæde brugt'});
-    extra.push({n:(leftover>=0?'+':'')+nf(leftover,1)+'<small> m</small>', l:leftover>=0?'Overskud':'Mangler'});
+    if (byDist){
+      extra.push({n:nf(recommend,0)+'<small> m</small>', l:'★ Anbefalet kædelængde'});
+      extra.push({n:nf(usedTotal,1)+'<small> m</small>', l:'Faktisk forbrug'});
+    } else {
+      extra.push({n:nf(usedTotal,1)+'<small> m</small>', l:'Kæde brugt'});
+      extra.push({n:(leftover>=0?'+':'')+nf(leftover,1)+'<small> m</small>', l:leftover>=0?'Overskud':'Mangler'});
+    }
     const stats = res.stats.concat(extra);
     document.getElementById('stats').innerHTML = stats.map(s=>
       `<div class="stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`).join('');
@@ -703,8 +787,11 @@
     const dimTxt = surface==='vaeg'
       ? `Væg ${nf(W,1)} × ${nf(L,1)} m (b×h)`
       : `Rum ${nf(L,1)} × ${nf(W,1)} m`;
+    const chainTxt = byDist
+      ? `Anbefalet kæde ${nf(recommend,0)} m (${nf(S.P,0)} cm mellem ${SPACING_WORD[mode]})`
+      : `Kæde ${nf(C,0)} m`;
     document.getElementById('printsummary').innerHTML =
-      `${dimTxt} · Kæde ${nf(C,0)} m · ${nf(N,0)} LED · ${MODE_LABEL[mode]}` +
+      `${dimTxt} · ${chainTxt} · ${nf(N,0)} LED · ${MODE_LABEL[mode]}` +
       (sagM>0 ? ` · nedhæng ${nf(G,0)} cm${mid?` (→ ${nf(G/4,1)} cm m. krog)`:''}` : '') +
       (mid ? ' · krog midt på stræk' : '');
   }
@@ -714,14 +801,14 @@
   function setVal(t,v){
     v = clamp(t, Math.round(v*1000)/1000); S[t]=v;
     const dec=(t==='W'||t==='L')?1:0;
-    const unit = t==='G'?' cm':((t==='W'||t==='L'||t==='C')?' m':'');
+    const unit = (t==='G'||t==='P')?' cm':((t==='W'||t==='L'||t==='C')?' m':'');
     document.getElementById('v'+t).textContent = nf(v,dec)+unit;
     const r=document.getElementById('r'+t), n=document.getElementById('n'+t);
     if (r && document.activeElement!==r) r.value=v;
     if (n && document.activeElement!==n) n.value=(t==='W'||t==='L')?v.toFixed(1):v;
     update();
   }
-  ['W','L','C','N','G'].forEach(t=>{
+  ['W','L','C','N','G','P'].forEach(t=>{
     document.getElementById('r'+t).addEventListener('input', e=> setVal(t, parseFloat(e.target.value)));
     document.getElementById('n'+t).addEventListener('input', e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) setVal(t,v); });
   });
@@ -744,7 +831,20 @@
     document.getElementById('lblW').textContent = tree ? 'Juletræ bredde' : s.lblW;
     document.getElementById('lblL').textContent = tree ? 'Juletræ højde'  : s.lblL;
     document.getElementById('hint').textContent = HINTS[S.mode];
+    applyCalcMode();
   }
+  function applyCalcMode(){
+    const byDist = S.calcBy==='afstand';
+    document.getElementById('fieldC').hidden = byDist;
+    document.getElementById('fieldP').hidden = !byDist;
+    document.querySelectorAll('#calcToggle button').forEach(x=>
+      x.setAttribute('aria-pressed', (x.dataset.calc===S.calcBy)?'true':'false'));
+    document.getElementById('lblP').textContent = SPACING_LABEL[S.mode];
+  }
+  document.querySelectorAll('#calcToggle button').forEach(b=> b.addEventListener('click', ()=>{
+    S.calcBy = b.dataset.calc;
+    applyCalcMode(); update();
+  }));
   function buildModes(){
     const box = document.getElementById('modeToggle');
     box.innerHTML = SURFACES[S.surface].modes.map(m=>
@@ -767,12 +867,12 @@
 
   buildModes();
   applyLabels();
-  ['W','L','C','N','G'].forEach(t=> setVal(t, S[t]));
+  ['W','L','C','N','G','P'].forEach(t=> setVal(t, S[t]));
 </script>
 
 <script>
   // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
-  const APP_VERSION = '1.4.0';
+  const APP_VERSION = '1.5.0';
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () =>
       navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));
