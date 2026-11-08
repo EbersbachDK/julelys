@@ -1567,7 +1567,9 @@
     saveRoom(); update();
   });
   document.querySelectorAll('#starToggle button').forEach(b=> b.addEventListener('click', ()=>{
-    S.starOne = b.dataset.one==='1'; update();
+    S.starOne = b.dataset.one==='1';
+    try{ localStorage.setItem('julelys.starOne', S.starOne?'1':'0'); }catch(e){}
+    update();
   }));
   document.querySelectorAll('#rotToggle button').forEach(b=> b.addEventListener('click', ()=>{
     S.rot = +b.dataset.rot; saveRoom(); update();
@@ -1638,13 +1640,14 @@
   buildModes();
   applyLabels();
   loadRoom();
+  try{ S.starOne = localStorage.getItem('julelys.starOne')==='1'; }catch(e){}
   applyShape();
   ['W','L','C','N','G','P','E'].forEach(t=> setVal(t, S[t]));
 </script>
 
 <script>
   // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
-  const APP_VERSION = '1.9.1';
+  const APP_VERSION = '1.9.2';
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () =>
       navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));
