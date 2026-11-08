@@ -298,6 +298,15 @@
         <p class="hint">Langs = mønstret følger rummets længste væg. På tværs drejer det 90°. I rum med hjørner fyldes hver del for sig, og kæden følger væggen fra den ene del til den næste.</p>
       </div>
 
+      <div class="field" id="starField" hidden>
+        <label>Stjerner</label>
+        <div class="toggle" id="starToggle" role="group" aria-label="Én stjerne eller flere inden i hinanden">
+          <button data-one="1" aria-pressed="false">Én stjerne</button>
+          <button data-one="0" aria-pressed="true">Flere inden i hinanden</button>
+        </div>
+        <p class="hint"><b>Én stjerne</b> = kun den store stjerne, resten af kæden bliver til overs. <b>Flere</b> = stjerner inden i hinanden, så hele kæden bruges.</p>
+      </div>
+
       <div class="field" id="fieldE" hidden>
         <label for="rE">Afstand fra væggen <span class="val" id="vE">10 cm</span></label>
         <input type="range" id="rE" min="0" max="50" step="1" value="10">
@@ -365,7 +374,7 @@
 
 <script>
   const NS="http://www.w3.org/2000/svg";
-  const S = { W:1, L:4, C:40, N:400, G:10, P:20, E:10, bulb:1.5, surface:'loft', shape:'rect', room:null, sel:[], selV:null, rot:0, mode:'zig', mid:false, calcBy:'kaede' };
+  const S = { W:1, L:4, C:40, N:400, G:10, P:20, E:10, bulb:1.5, surface:'loft', shape:'rect', room:null, sel:[], selV:null, rot:0, starOne:false, mode:'zig', mid:false, calcBy:'kaede' };
   const STEP = { W:0.1, L:0.1, C:1, N:10, G:1, P:1, E:1 };
   const MIN = { W:0.3, L:1, C:1, N:1, G:0, P:2, E:0 };
   const MAX = { W:20, L:20, C:200, N:3000, G:40, P:300, E:50 };
@@ -655,7 +664,8 @@
   function calcStar(W,L,C,mid,forceN){
     const f=starFit(W,L), per=plen(closeRing(starPts(f,1)));
     let k=0;
-    if(forceN) k=Math.max(1,Math.round(forceN));
+    if(S.starOne) k = (forceN || per<=C+1e-9) ? 1 : 0;                       // kun den store stjerne
+    else if(forceN) k=Math.max(1,Math.round(forceN));
     else for(let n=1;n<=60;n++){ if(per*(n+1)/2<=C+1e-9) k=n; else break; }   // stjerne i har størrelse (n-i)/n
     const base={ domain:{w:W,h:L}, ground:true };
     if(!k){   // kæden rækker ikke engang én stjerne rundt
@@ -1336,6 +1346,10 @@
       document.getElementById('rotField').hidden = !(mode==='zig'||mode==='snake');
       document.querySelectorAll('#rotToggle button').forEach(x=> x.setAttribute('aria-pressed', (+x.dataset.rot===S.rot)?'true':'false')); }
     else { document.getElementById('fieldE').hidden = true; document.getElementById('rotField').hidden = true; }
+    const isStar = surface==='vaeg' && mode==='star', starOne = isStar && S.starOne;
+    document.getElementById('starField').hidden = !isStar;
+    document.querySelectorAll('#starToggle button').forEach(x=> x.setAttribute('aria-pressed', (x.dataset.one==='1')===S.starOne?'true':'false'));
+    document.getElementById('fieldP').hidden = !byDist || starOne;          // én stjerne: ingen afstand at vælge
     const areaM2 = poly ? Math.abs(polyArea(S.room)) : W*L;
     const lightBand = lightInfo(areaM2, N);
 
@@ -1362,7 +1376,8 @@
       st.innerHTML = `<b>${res.invalid?'Rummet kan ikke beregnes':'Vælg vægge'}</b> — ${res.error}`;
     } else if (byDist){
       st.className='status ok';
-      st.innerHTML = `Med <b>${nf(S.P,0)} cm</b> mellem ${SPACING_WORD[mode]} skal du bruge ca. <b>${nf(usedTotal,1)} m</b> lyskæde` +
+      st.innerHTML = (starOne ? `Én stjerne kræver ca. <b>${nf(usedTotal,1)} m</b> lyskæde`
+        : `Med <b>${nf(S.P,0)} cm</b> mellem ${SPACING_WORD[mode]} skal du bruge ca. <b>${nf(usedTotal,1)} m</b> lyskæde`) +
         (sagM>0 ? ` (inkl. nedhæng)` : ``) + ` — køb mindst <b>${nf(recommend,0)} m</b>.`;
     } else if (res.partial){
       st.className='status warn';
@@ -1417,7 +1432,7 @@
       : poly ? `Rum (tegnet) ${nf(areaM2,1)} m², ${S.room.length} vægge`
       : `Rum ${nf(L,1)} × ${nf(W,1)} m`;
     const chainTxt = byDist
-      ? `Anbefalet kæde ${nf(recommend,0)} m (${nf(S.P,0)} cm mellem ${SPACING_WORD[mode]})`
+      ? `Anbefalet kæde ${nf(recommend,0)} m` + (starOne ? ' (én stjerne)' : ` (${nf(S.P,0)} cm mellem ${SPACING_WORD[mode]})`)
       : `Kæde ${nf(C,0)} m`;
     document.getElementById('printsummary').innerHTML =
       `${dimTxt} · ${chainTxt} · ${nf(N,0)} LED · ${MODE_LABEL[mode]}` +
@@ -1551,6 +1566,9 @@
     else return;
     saveRoom(); update();
   });
+  document.querySelectorAll('#starToggle button').forEach(b=> b.addEventListener('click', ()=>{
+    S.starOne = b.dataset.one==='1'; update();
+  }));
   document.querySelectorAll('#rotToggle button').forEach(b=> b.addEventListener('click', ()=>{
     S.rot = +b.dataset.rot; saveRoom(); update();
   }));
@@ -1626,7 +1644,7 @@
 
 <script>
   // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
-  const APP_VERSION = '1.9.0';
+  const APP_VERSION = '1.9.1';
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () =>
       navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));

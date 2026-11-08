@@ -148,6 +148,22 @@ for (const [W, L] of [[1, 1], [2, 1.5], [1.2, 2.4], [4, 2.5], [0.5, 3]]) {
   ok(ra.shapes.length === k && !ra.partial, `stjerne W${W} L${L} afstand: ${ra.shapes.length} stjerner, ventede ${k}`);
 }
 
+// Væg: én stjerne
+console.log('Væg: én stjerne');
+T.S.starOne = true;
+for (const [W, L] of [[1, 1], [2.4, 2], [0.5, 3]]) {
+  const per = T.calcStar(W, L, 1e6, false, 1).used;
+  for (const C of [0.5, per - 0.01, per, per + 5, 200]) {
+    const r = T.calcStar(W, L, C, false);
+    if (C >= per) ok(!r.partial && r.shapes.length === 1 && near(r.used, per, 1e-9), `én stjerne W${W} L${L} C${C}: ${r.shapes.length} stjerner, brugt ${r.used}`);
+    else ok(r.partial && near(r.used, C, 1e-9), `én stjerne W${W} L${L} C${C}: for kort → partial, brugt ${r.used}`);
+  }
+  const ra = T.calcStar(W, L, 0, false, 7);
+  ok(ra.shapes.length === 1 && !ra.partial, `én stjerne W${W} L${L} afstands-mode: altid 1 stjerne`);
+}
+T.S.starOne = false;
+ok(T.calcStar(2.4, 2, 200, false).shapes.length > 1, 'flere stjerner igen når starOne=false');
+
 // Zoner: L-rum giver 2 konvekse zoner, U giver 3, rektangel 1
 ok(T.sweepCells([[0, 0], [5, 0], [5, 3], [0, 3]]).length === 1, 'rektangel = 1 zone');
 ok(T.sweepCells([[0, 0], [6, 0], [6, 2], [3, 2], [3, 5], [0, 5]]).length === 2, 'L = 2 zoner');
@@ -257,6 +273,7 @@ console.log('Røgtest af update()');
     const modes = surface === 'vaeg' ? ['tree', 'star', 'wzig', 'curtain'] : shape === 'poly' ? ['zig', 'snake', 'spiral', 'edge'] : ['zig', 'dia', 'snake', 'spiral'];
     for (const mode of modes) for (const calcBy of ['kaede', 'afstand']) for (const G of [0, 10]) {
       S.mode = mode; S.calcBy = calcBy; S.G = G;
+      if (mode === 'star') { for (const one of [false, true]) { S.starOne = one; run(`stjerne ${one ? 'én' : 'flere'} ${calcBy} G${G}`); } S.starOne = false; continue; }
       if (shape === 'poly' && surface === 'loft') for (const [name, P] of Object.entries(ROOMS)) {
         S.room = P.map(p => p.slice()); S.sel = P.map(() => true); run(`${name} ${mode} ${calcBy} G${G}`);
       } else run(`${surface} ${shape} ${mode} ${calcBy} G${G}`);
