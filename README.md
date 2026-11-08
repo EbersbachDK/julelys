@@ -7,7 +7,7 @@ Beregn og tegn ophæng af en lyskæde på loftet. Indtast rummets mål, kædens 
 - Virker på computer, iPad og telefon
 - Kan lægges på hjemmeskærmen (Android: menu → Føj til startskærm · iPhone: Del → Føj til hjemmeskærm) og bruges offline
 - "Gem plan som PDF"-knap (browserens egen Gem som PDF)
-- **Tegn selv:** tegn et loft med fri form (L-rum, skrå vægge …) — træk i hjørnerne, tryk + for nye hjørner, ret væglængder. Mønstre: Spiral og *Følg væggene* (vælg selv hvilke vægge kæden følger)
+- **Tegn selv:** tegn et loft med fri form (L-rum, skrå vægge …) — træk i hjørnerne, tryk + for nye hjørner, ret væglængder. Mønstre: Zigzag, Slange (Langs/På tværs — rummet deles i zoner, kæden følger væggen imellem), Spiral og *Følg væggene* (vælg selv hvilke vægge kæden følger)
 
 ## Udvikling
 

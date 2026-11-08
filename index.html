@@ -72,6 +72,7 @@
   .toggle { display:flex; flex-wrap:wrap; gap:4px; background:var(--green-soft); border-radius:14px; padding:4px; margin-top:4px; }
   .toggle button { flex:1 1 40%; border:0; background:transparent; color:var(--muted); font-family:var(--body); font-size:.9rem; font-weight:600; padding:9px 8px; border-radius:10px; cursor:pointer; }
   .toggle button[aria-pressed="true"] { background:var(--green); color:#fff; }
+  .toggle button:disabled { opacity:.4; cursor:not-allowed; }
   :root[data-theme="dark"] .toggle button[aria-pressed="true"],
   :root:not([data-theme="light"]) .toggle button[aria-pressed="true"] { color:#0c110c; }
   .hint { color:var(--muted); font-size:.82rem; margin:8px 2px 0; }
@@ -187,7 +188,7 @@
           <button data-shape="rect" aria-pressed="true">Rektangel</button>
           <button data-shape="poly" aria-pressed="false">Tegn selv</button>
         </div>
-        <p class="hint" id="shapeHint" hidden>Træk i hjørnerne på tegningen, tryk <b>+</b> midt på en væg for et nyt hjørne, eller ret væggenes længde herunder.</p>
+        <p class="hint" id="shapeHint" hidden>Træk i hjørnerne på tegningen, tryk <b>+</b> midt på en væg for et nyt hjørne, eller ret væggenes længde herunder. Diamant findes kun i rektangel-tilstand.</p>
       </div>
 
       <div class="field" id="wallField" hidden>
@@ -288,6 +289,15 @@
         <p class="hint" id="hint"></p>
       </div>
 
+      <div class="field" id="rotField" hidden>
+        <label>Retning</label>
+        <div class="toggle" id="rotToggle" role="group" aria-label="Mønstrets retning">
+          <button data-rot="0" aria-pressed="true">Langs</button>
+          <button data-rot="1" aria-pressed="false">På tværs</button>
+        </div>
+        <p class="hint">Langs = mønstret følger rummets længste væg. På tværs drejer det 90°. I rum med hjørner fyldes hver del for sig, og kæden følger væggen fra den ene del til den næste.</p>
+      </div>
+
       <div class="field" id="fieldE" hidden>
         <label for="rE">Afstand fra væggen <span class="val" id="vE">10 cm</span></label>
         <input type="range" id="rE" min="0" max="50" step="1" value="10">
@@ -355,7 +365,7 @@
 
 <script>
   const NS="http://www.w3.org/2000/svg";
-  const S = { W:1, L:4, C:40, N:400, G:10, P:20, E:10, bulb:1.5, surface:'loft', shape:'rect', room:null, sel:[], selV:null, mode:'zig', mid:false, calcBy:'kaede' };
+  const S = { W:1, L:4, C:40, N:400, G:10, P:20, E:10, bulb:1.5, surface:'loft', shape:'rect', room:null, sel:[], selV:null, rot:0, mode:'zig', mid:false, calcBy:'kaede' };
   const STEP = { W:0.1, L:0.1, C:1, N:10, G:1, P:1, E:1 };
   const MIN = { W:0.3, L:1, C:1, N:1, G:0, P:2, E:0 };
   const MAX = { W:20, L:20, C:200, N:3000, G:40, P:300, E:50 };
@@ -775,7 +785,209 @@
         {n:nf(e*100,0)+'<small> cm</small>', l:'Afstand fra væggen'},
       ]};
   }
+  // ---------- Frie rum: zigzag og slange ----------
+  // Rummet drejes, så længste væg ligger vandret (x), evt. +90° ("På tværs"). Mønstret regnes i det drejede rum Q og drejes tilbage.
+  const rotPts = (pts,ang)=>{ const c=Math.cos(ang), s=Math.sin(ang); return pts.map(([x,y])=>[x*c-y*s, x*s+y*c]); };
+  const swapXY = pts => pts.map(([x,y])=>[y,x]);
+  function roomFrame(P, across){
+    let best=-1, ang=0;
+    for(let i=0;i<P.length;i++){ const L=wallLen(P,i); if(L>best+1e-9){ best=L; const a=P[i], b=P[(i+1)%P.length]; ang=Math.atan2(b[1]-a[1], b[0]-a[0]); } }
+    while(ang<=-Math.PI/2+1e-12) ang+=Math.PI;
+    while(ang>Math.PI/2+1e-12) ang-=Math.PI;
+    if(across) ang+=Math.PI/2;
+    if(Math.abs(ang)<1e-12) return { Q:P.map(p=>p.slice()), back:pts=>pts };
+    return { Q:rotPts(P,-ang), back:pts=>rotPts(pts,ang) };
+  }
+  // Opdel Q i konvekse zoner med lodret fejelinje: zonens bund og top er vægge, siderne lodrette snit.
+  // Ny zone ved spring i bund/top (lodret væg), deling/samling og ved indadgående hjørner.
+  function sweepCells(Q){
+    const n=Q.length, E=[];
+    for(let i=0;i<n;i++) E.push({a:Q[i], b:Q[(i+1)%n]});
+    const yAt=(e,x)=>{ const {a,b}=e, dx=b[0]-a[0]; return Math.abs(dx)<1e-12 ? a[1] : a[1]+(b[1]-a[1])*(x-a[0])/dx; };
+    const slope=e=> (e.b[1]-e.a[1])/(e.b[0]-e.a[0]);
+    const xs=[]; Q.map(p=>p[0]).sort((a,b)=>a-b).forEach(x=>{ if(!xs.length || x-xs[xs.length-1]>1e-7) xs.push(x); });
+    const slabs=[];
+    for(let k=0;k<xs.length-1;k++){
+      const xm=(xs[k]+xs[k+1])/2, hits=[];
+      E.forEach((e,i)=>{ if(Math.min(e.a[0],e.b[0])<xm && Math.max(e.a[0],e.b[0])>xm) hits.push({i, y:yAt(e,xm)}); });
+      hits.sort((p,q)=>p.y-q.y);
+      const iv=[]; for(let j=0;j+1<hits.length;j+=2) iv.push({b:hits[j].i, t:hits[j+1].i, cell:-1});
+      slabs.push({x0:xs[k], x1:xs[k+1], iv});
+    }
+    const cells=[];
+    slabs.forEach((sl,k)=> sl.iv.forEach(I=>{
+      if(I.cell>=0) return;
+      const cell={ x0:sl.x0, bot:[[sl.x0, yAt(E[I.b],sl.x0)]], top:[[sl.x0, yAt(E[I.t],sl.x0)]] };
+      let kk=k, cur=I;
+      for(;;){
+        cur.cell=cells.length;
+        const xe=slabs[kk].x1, yb=yAt(E[cur.b],xe), yt=yAt(E[cur.t],xe);
+        cell.bot.push([xe,yb]); cell.top.push([xe,yt]);
+        const nx=slabs[kk+1]; if(!nx) break;
+        const J=nx.iv.find(J=> J.cell<0 && Math.abs(yAt(E[J.b],xe)-yb)<1e-7 && Math.abs(yAt(E[J.t],xe)-yt)<1e-7);
+        if(!J) break;
+        if(J.b!==cur.b && slope(E[J.b]) < slope(E[cur.b])-1e-9) break;   // bunden knækker nedad = indadgående hjørne
+        if(J.t!==cur.t && slope(E[J.t]) > slope(E[cur.t])+1e-9) break;   // toppen knækker opad
+        kk++; cur=J;
+      }
+      cell.x1=cell.bot[cell.bot.length-1][0];
+      cells.push(cell);
+    }));
+    return cells;
+  }
+  function chainY(ch,x){
+    for(let i=0;i<ch.length-1;i++){ const a=ch[i], b=ch[i+1];
+      if(x<=b[0]+1e-12 || i===ch.length-2){ const dx=b[0]-a[0]; return dx<1e-12 ? a[1] : a[1]+(b[1]-a[1])*(x-a[0])/dx; } }
+    return ch[0][1];
+  }
+  // Punkter langs en zone-kant (bund/top) fra x=xa til x=xb, inkl. knæk imellem.
+  function chainBetween(ch,xa,xb){
+    const pts=[[xa,chainY(ch,xa)]], lo=Math.min(xa,xb), hi=Math.max(xa,xb);
+    const mid=ch.filter(p=>p[0]>lo+1e-9 && p[0]<hi-1e-9);
+    (xb>=xa?mid:mid.slice().reverse()).forEach(p=>pts.push(p.slice()));
+    pts.push([xb,chainY(ch,xb)]);
+    return pts;
+  }
+  // Position langs omkredsen (meter fra hjørne 0) og vandring langs væggene mellem to punkter.
+  function perimPos(Q,p){
+    let s=0, best=null;
+    for(let i=0;i<Q.length;i++){ const a=Q[i], b=Q[(i+1)%Q.length], L=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      const t=L<1e-12?0:Math.max(0,Math.min(1,((p[0]-a[0])*(b[0]-a[0])+(p[1]-a[1])*(b[1]-a[1]))/(L*L)));
+      const d=Math.hypot(a[0]+(b[0]-a[0])*t-p[0], a[1]+(b[1]-a[1])*t-p[1]);
+      if(!best || d<best.d) best={d, s:s+t*L};
+      s+=L; }
+    return best.s;
+  }
+  function wallWalk(Q,p,q){
+    const n=Q.length, cum=[0]; for(let i=0;i<n;i++) cum.push(cum[i]+wallLen(Q,i));
+    const per=cum[n], s1=perimPos(Q,p), s2=perimPos(Q,q);
+    const fw=((s2-s1)%per+per)%per, bw=per-fw, fwd=fw<=bw, len=fwd?fw:bw, mid=[];
+    for(let j=0;j<n;j++){ const rel=fwd ? ((cum[j]-s1)%per+per)%per : ((s1-cum[j])%per+per)%per;
+      if(rel>1e-9 && rel<len-1e-9) mid.push({rel, p:Q[j]}); }
+    mid.sort((a,b)=>a.rel-b.rel);
+    return { pts:[p].concat(mid.map(m=>m.p.slice()), [q]), len };
+  }
+  // Forbindelse mellem to zoner: lige ned/op ad et lodret snit hvis muligt, ellers langs væggene.
+  function connector(Q,p,q){
+    if(Math.hypot(q[0]-p[0],q[1]-p[1])<1e-9) return {pts:[p,q], len:0};
+    if(Math.abs(p[0]-q[0])<1e-7){
+      const m=[(p[0]+q[0])/2,(p[1]+q[1])/2]; let ok=pointInPoly(m,Q,1e-7);
+      for(let i=0;ok && i<Q.length;i++) if(segsCross(p,q,Q[i],Q[(i+1)%Q.length])) ok=false;
+      if(ok) return {pts:[p,q], len:Math.abs(q[1]-p[1])};
+    }
+    return wallWalk(Q,p,q);
+  }
+  // Zigzag i én zone: kroge skiftevis på bund og top med fast fremrykning.
+  function zigFill(cell,a,dir,side){
+    const w=cell.x1-cell.x0, m=Math.max(1,Math.round(w/a)), step=w/m, pts=[];
+    for(let j=0;j<=m;j++){ const x=dir>0?cell.x0+j*step:cell.x1-j*step, top=(j%2===0)===(side==='t');
+      pts.push([x, chainY(top?cell.top:cell.bot, x)]); }
+    return { pts, hooks:pts.map(p=>p.slice()), spans:segLens(pts), units:m };
+  }
+  // Slange i én zone: lodrette baner (i Q' = Q med x/y byttet) og vendinger langs zonens væg.
+  function snakeFill(cell,s,dir,side){
+    const w=cell.x1-cell.x0, m=Math.max(1,Math.round(w/s)), pts=[], hooks=[], spans=[];
+    const xsL=[]; for(let j=0;j<m;j++) xsL.push(dir>0 ? cell.x0+(j+0.5)*w/m : cell.x1-(j+0.5)*w/m);
+    let up=(side==='b');
+    xsL.forEach((x,j)=>{
+      const yb=chainY(cell.bot,x), yt=chainY(cell.top,x), a=[x,up?yb:yt], b=[x,up?yt:yb], L=Math.abs(yt-yb);
+      if(j>0){ const prev=pts[pts.length-1], turn=chainBetween(up?cell.bot:cell.top, prev[0], x);
+        for(let k=1;k<turn.length;k++){ spans.push(Math.hypot(turn[k][0]-turn[k-1][0],turn[k][1]-turn[k-1][1])); if(k<turn.length-1){ pts.push(turn[k]); hooks.push(turn[k]); } } }
+      pts.push(a, b);
+      const seg=Math.max(1,Math.round(L));
+      for(let k=0;k<=seg;k++) hooks.push([x, a[1]+(b[1]-a[1])*k/seg]);
+      for(let k=0;k<seg;k++) spans.push(L/seg);
+      up=!up;
+    });
+    return { pts, hooks, spans, units:m };
+  }
+  // Fyld alle zoner i fejeretning og bind dem sammen; vælg retning/startside der giver kortest forbindelse.
+  function fillRoom(Q,cells,fill,param){
+    const order=cells.map((c,i)=>i).sort((i,j)=> (cells[i].x0-cells[j].x0) || (chainY(cells[i].bot,cells[i].x0)-chainY(cells[j].bot,cells[j].x0)));
+    let path=[], hooks=[], spans=[], units=0, conn=0;
+    for(const ci of order){
+      let best=null;
+      for(const dir of [1,-1]) for(const side of ['b','t']){
+        const f=fill(cells[ci],param,dir,side);
+        if(!path.length){ if(!best) best=f; continue; }
+        const c=connector(Q, path[path.length-1], f.pts[0]);
+        if(!best || c.len<best.c.len-1e-9){ f.c=c; best=f; }
+      }
+      if(best.c){ const cp=best.c.pts; conn+=best.c.len;
+        for(let k=1;k<cp.length;k++){ const L=Math.hypot(cp[k][0]-cp[k-1][0],cp[k][1]-cp[k-1][1]); if(L<1e-9) continue;
+          const pieces=Math.max(1,Math.round(L));
+          for(let j=1;j<=pieces;j++) hooks.push([cp[k-1][0]+(cp[k][0]-cp[k-1][0])*j/pieces, cp[k-1][1]+(cp[k][1]-cp[k-1][1])*j/pieces]);
+          for(let j=0;j<pieces;j++) spans.push(L/pieces);
+          if(k<cp.length-1) path.push(cp[k]); } }
+      best.pts.forEach(p=>{ const l=path[path.length-1]; if(!l || Math.hypot(p[0]-l[0],p[1]-l[1])>1e-9) path.push(p); });
+      hooks=hooks.concat(best.hooks); spans=spans.concat(best.spans); units+=best.units;
+    }
+    const seen=new Set(), uh=[];
+    hooks.forEach(h=>{ const k=h[0].toFixed(4)+','+h[1].toFixed(4); if(!seen.has(k)){ seen.add(k); uh.push(h); } });
+    return { path, hooks:uh, spans, units, conn, used:plen(path) };
+  }
+  // Fælles: find tætteste mønster der passer i kæden (eller brug fast afstand), drej tilbage.
+  function polyPattern(P,C,spacingM,kind){
+    const fr=roomFrame(P, !!S.rot);
+    const Q = kind==='snake' ? swapXY(fr.Q) : fr.Q;
+    const back = pts => kind==='snake' ? fr.back(swapXY(pts)) : fr.back(pts);
+    const cells=sweepCells(Q);
+    if(!cells.length) return polyErr('Rummet kunne ikke deles op — prøv at flytte et hjørne lidt.');
+    const fill = kind==='snake' ? snakeFill : zigFill;
+    const span = kind==='snake' ? (()=>{ let lo=Infinity,hi=-Infinity; Q.forEach(p=>{lo=Math.min(lo,p[0]);hi=Math.max(hi,p[0]);}); return hi-lo; })()
+                                : cells.reduce((t,c)=>t+(c.x1-c.x0),0);
+    let r=null, param;
+    if(spacingM){ param=spacingM; r=fillRoom(Q,cells,fill,param); }
+    else {
+      // Største antal (n) der passer i kæden: fordobl til den ikke passer, halvér ind, og tjek de næste par n
+      // (forbrug stiger næsten monotont med n; afrunding pr. zone kan give små hop).
+      const maxN = kind==='snake' ? 300 : 800, memo=new Map();
+      const tryN = n => { if(!memo.has(n)) memo.set(n, fillRoom(Q,cells,fill,span/n)); return memo.get(n); };
+      const fits = n => tryN(n).used<=C+1e-9;
+      if(fits(1)){
+        let lo=1, hi=2; while(hi<=maxN && fits(hi)){ lo=hi; hi*=2; }
+        hi=Math.min(hi,maxN+1);
+        while(hi-lo>1){ const m=(lo+hi)>>1; if(fits(m)) lo=m; else hi=m; }
+        for(let n=lo+1;n<=Math.min(maxN,lo+3);n++) if(fits(n)) lo=n;
+        r=tryN(lo); param=span/lo;
+      }
+    }
+    let partial=false;
+    if(!r){ param=span; r=fillRoom(Q,cells,fill,param); const t=truncate(r.path,C); partial=true;
+      const ha=hooksAlong(t.pts, L=>Math.max(1,Math.round(L)));
+      r={...r, path:t.pts, used:t.used, hooks:ha.hooks, spans:ha.spans}; }
+    return { r, param, partial, cells:cells.length, back };
+  }
+  function calcPolyZig(P,C,spacingM){
+    const pp=polyPattern(P,C,spacingM?spacingM/2:0,'zig'); if(pp.error) return pp;
+    const {r,param:a,partial,cells,back}=pp;
+    const st=[
+      {n:nf(r.units), l:'Skrå stræk'},
+      {n:nf(r.hooks.length), l:'Kroge i alt'},
+      {n:nf(2*a*100,0)+'<small> cm</small>', l:'Afstand mellem kroge (pr. side)'},
+      {n:nf(a*100,0)+'<small> cm</small>', l:'Frem pr. tak'},
+    ];
+    if(cells>1) st.push({n:nf(cells), l:'Zoner'});
+    if(r.conn>0.005) st.push({n:nf(r.conn,1)+'<small> m</small>', l:'Langs væggen mellem zoner'});
+    return { shapes:[{points:back(r.path),color:'var(--gold)'}], hooks:back(r.hooks), used:r.used, spans:r.spans,
+      spacing:2*a*100, partial, reach:null, stats:st };
+  }
+  function calcPolySnake(P,C,spacingM){
+    const pp=polyPattern(P,C,spacingM||0,'snake'); if(pp.error) return pp;
+    const {r,param:s,partial,cells,back}=pp;
+    const st=[
+      {n:nf(r.units), l:'Baner'},
+      {n:nf(r.hooks.length), l:'Kroge i alt'},
+      {n:nf(s*100,0)+'<small> cm</small>', l:'Afstand mellem baner'},
+    ];
+    if(cells>1) st.push({n:nf(cells), l:'Zoner'});
+    if(r.conn>0.005) st.push({n:nf(r.conn,1)+'<small> m</small>', l:'Langs væggen mellem zoner'});
+    return { shapes:[{points:back(r.path),color:'var(--gold)'}], hooks:back(r.hooks), used:r.used, spans:r.spans,
+      spacing:s*100, partial, reach:null, stats:st };
+  }
   const CALC_POLY = {
+    zig:   (P,C,sp)=> calcPolyZig(P,C,sp),
+    snake: (P,C,sp)=> calcPolySnake(P,C,sp),
     spiral:(P,C,sp)=> calcPolySpiral(P,C,sp),
     edge:  (P,C,sp)=> calcPolyEdge(P,C,sp,S.sel,S.E/100)
   };
@@ -1060,8 +1272,10 @@
     treeGuide(res);
     if (poly){ renderWalls();
       delBtn.disabled = S.selV==null || S.room.length<=3;
-      document.getElementById('fieldE').hidden = mode!=='edge'; }
-    else document.getElementById('fieldE').hidden = true;
+      document.getElementById('fieldE').hidden = mode!=='edge';
+      document.getElementById('rotField').hidden = !(mode==='zig'||mode==='snake');
+      document.querySelectorAll('#rotToggle button').forEach(x=> x.setAttribute('aria-pressed', (+x.dataset.rot===S.rot)?'true':'false')); }
+    else { document.getElementById('fieldE').hidden = true; document.getElementById('rotField').hidden = true; }
     const areaM2 = poly ? Math.abs(polyArea(S.room)) : W*L;
     const lightBand = lightInfo(areaM2, N);
 
@@ -1173,7 +1387,7 @@
 
   // ---------- flade + mønster ----------
   const MID_MODES = ['zig','dia','wzig'];
-  function midApplicable(){ return S.W>=5 && MID_MODES.includes(S.mode); }
+  function midApplicable(){ return !isPoly() && S.W>=5 && MID_MODES.includes(S.mode); }
   document.querySelectorAll('#midToggle button').forEach(b=> b.addEventListener('click', ()=>{
     S.mid = b.dataset.mid==='1';
     update();
@@ -1209,9 +1423,12 @@
   }));
   function buildModes(){
     const box = document.getElementById('modeToggle');
-    box.innerHTML = modesFor().map(m=>
-      `<button data-mode="${m}" aria-pressed="${m===S.mode?'true':'false'}">${MODE_LABEL[m]}</button>`).join('');
-    box.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
+    // I tegnet rum vises Diamant gråtonet (kun rektangel)
+    const shown = isPoly() ? ['zig','dia','snake','spiral','edge'] : modesFor();
+    box.innerHTML = shown.map(m=> (isPoly() && !POLY_MODES.includes(m))
+      ? `<button data-mode="${m}" disabled title="Diamant findes kun i rektangel-tilstand" aria-pressed="false">${MODE_LABEL[m]}</button>`
+      : `<button data-mode="${m}" aria-pressed="${m===S.mode?'true':'false'}">${MODE_LABEL[m]}</button>`).join('');
+    box.querySelectorAll('button:not([disabled])').forEach(b=> b.addEventListener('click', ()=>{
       S.mode = b.dataset.mode;
       box.querySelectorAll('button').forEach(x=> x.setAttribute('aria-pressed', x===b?'true':'false'));
       applyLabels(); update();
@@ -1226,13 +1443,13 @@
   }));
 
   // ---------- Tegn selv: rumform, vægliste og træk på tegningen ----------
-  const POLY_MODES = ['spiral','edge'];        // v1.8.0: + zigzag og slange
+  const POLY_MODES = ['zig','snake','spiral','edge'];
   function modesFor(){ return isPoly() ? POLY_MODES : SURFACES[S.surface].modes; }
-  function saveRoom(){ try{ localStorage.setItem('julelys.room', JSON.stringify({shape:S.shape, room:S.room, sel:S.sel})); }catch(e){} }
+  function saveRoom(){ try{ localStorage.setItem('julelys.room', JSON.stringify({shape:S.shape, room:S.room, sel:S.sel, rot:S.rot})); }catch(e){} }
   function loadRoom(){
     try{ const o=JSON.parse(localStorage.getItem('julelys.room')||'null');
       if(o && Array.isArray(o.room) && o.room.length>=3 && o.room.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite))){
-        S.room=o.room; S.sel=o.room.map((_,i)=> !!(o.sel&&o.sel[i])); if(o.shape==='poly') S.shape='poly'; }
+        S.room=o.room; S.sel=o.room.map((_,i)=> !!(o.sel&&o.sel[i])); if(o.shape==='poly') S.shape='poly'; if(o.rot===1) S.rot=1; }
     }catch(e){}
   }
   function ensureRoom(){ if(!S.room){ S.room=rectRoom(); S.sel=S.room.map(()=>true); } }
@@ -1246,7 +1463,7 @@
     document.getElementById('fieldW').hidden = poly;
     document.getElementById('fieldL').hidden = poly;
     document.querySelectorAll('#shapeToggle button').forEach(x=> x.setAttribute('aria-pressed', x.dataset.shape===S.shape?'true':'false'));
-    if(!modesFor().includes(S.mode)) S.mode = poly ? 'edge' : SURFACES[S.surface].def;
+    if(!modesFor().includes(S.mode)) S.mode = poly ? 'zig' : SURFACES[S.surface].def;
     S.selV=null; frozenView=null;
     buildModes(); applyLabels();
   }
@@ -1274,6 +1491,9 @@
     else return;
     saveRoom(); update();
   });
+  document.querySelectorAll('#rotToggle button').forEach(b=> b.addEventListener('click', ()=>{
+    S.rot = +b.dataset.rot; saveRoom(); update();
+  }));
   document.getElementById('resetRoomBtn').addEventListener('click', ()=>{
     S.room=rectRoom(); S.sel=S.room.map(()=>true); S.selV=null; saveRoom(); update();
   });
@@ -1346,7 +1566,7 @@
 
 <script>
   // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
-  const APP_VERSION = '1.7.0';
+  const APP_VERSION = '1.8.0';
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () =>
       navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));

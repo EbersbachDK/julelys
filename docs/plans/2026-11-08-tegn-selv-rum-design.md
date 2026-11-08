@@ -1,6 +1,6 @@
 # Design: "Tegn selv"-rum i Julelys-beregneren
 
-Dato: 2026-11-08 · Status: godkendt, v1.7.0 under implementering
+Dato: 2026-11-08 · Status: implementeret — v1.7.0 og v1.8.0 udgivet 2026-11-08
 
 ## Formål
 Brugeren skal kunne tegne et loft med fri form (L/T/U-rum, skrå vægge) i stedet for kun bredde × længde, og få kæden beregnet til det rum.
@@ -26,7 +26,7 @@ Brugeren skal kunne tegne et loft med fri form (L/T/U-rum, skrå vægge) i stede
 ## Beregning
 - **Spiral:** omridset skrumpes ind (offset af væglinjer) med fast ringafstand d. D = største gyldige indrykning (bisektion); d = D/k. Kæde-tilstand: største k hvor sum af omkredse ≤ kæde. Afstands-tilstand: k = round(D/afstand). Stopper, når formen ville dele sig/vende (smalle arme begrænser D).
 - **Følg væggene:** valgte vægges linjer forskudt indad med afstand e, samlet i hjørner (skæring af naboliniers offset; endepunkter afsluttes mod nabovæggens offset). Krog i hvert knæk + ca. hver meter (afstands-tilstand: valgt krogafstand).
-- **Zigzag/slange (v1.8.0):** rummet drejes så længste væg ligger vandret ("Langs/På tværs" drejer 90°), opdeles i zoner ved indadgående hjørner (boustrophedon), hver zone fyldes, kæden følger væggen mellem zoner.
+- **Zigzag/slange (v1.8.0):** rummet drejes så længste væg ligger vandret ("Langs/På tværs" drejer 90°). Lodret fejelinje deler rummet i **konvekse zoner** (`sweepCells`): ny zone ved spring i bund/top (lodret væg), deling/samling og indadgående hjørner — så skrå stræk aldrig går gennem en væg. Zigzag fejer langs x (kroge skiftevis på zonens bund/top); slange regnes med x/y byttet, så banerne ligger langs den længste væg. Zonerne fyldes i fejeretning; for hver zone vælges retning + startside med kortest forbindelse. Forbindelse = lige langs et lodret snit hvis det ligger i rummet, ellers langs væggene (kortest vej rundt om omkredsen). Kæde-tilstand: største antal n (fordobling + halvering + tjek af n+1..n+3) med forbrug ≤ kæde. For kort kæde → klippes præcis ved kædens længde.
 - Kædepasning, nedhæng (to-pas), nøgletal og krog-prikker genbruges uændret — alle mønstre returnerer punkter + stræk.
 
 ## Test

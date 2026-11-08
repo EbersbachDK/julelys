@@ -38,7 +38,7 @@ const ctx = {
 };
 vm.createContext(ctx);
 vm.runInContext(script + `
-;globalThis.__T = { S, update, calcSpiral, calcPolySpiral, calcPolyEdge, polyArea, polyPerim, roomCheck,
+;globalThis.__T = { S, update, calcSpiral, calcPolySpiral, calcPolyEdge, calcZig, calcSnake, calcPolyZig, calcPolySnake, sweepCells, segsCross, polyArea, polyPerim, roomCheck,
   pointInPoly, insetPoly, setWallLen, insertVertex, deleteVertex, wallLen, applyShape, CALC_POLY, isPoly };`, ctx);
 const T = ctx.__T;
 
@@ -79,13 +79,53 @@ for (const [W, L] of [[3, 5], [1, 4], [4, 4], [2.5, 7.3], [6, 12]]) {
   }
 }
 
+// 2b) Zigzag og slange: tegnet rektangel = rektangel-tilstand (længde ≥ bredde → ingen drejning)
+console.log('Zigzag/slange: rektangel-ækvivalens');
+T.S.rot = 0;
+for (const [W, L] of [[1, 4], [3, 5], [2.5, 7.3], [4, 4], [6, 12]]) {
+  const R = [[0, 0], [L, 0], [L, W], [0, W]];
+  for (const C of [3, 9, 20, 40.5, 120]) {
+    const a = T.calcZig(W, L, C, false), b = T.calcPolyZig(R, C, 0);
+    if (!a.partial) ok(!b.partial && near(a.used, b.used, 1e-6) && a.hooks.length === b.hooks.length,
+      `zig W${W} L${L} C${C}: ${a.used}/${a.hooks.length}/${a.partial} vs ${b.used}/${b.hooks.length}/${b.partial}`);
+    // for kort kæde: rektangel-tilstanden lægger hele stræk (kan overskride kæden); tegnet klipper præcis ved kæden
+    else ok(b.partial && b.used <= C + 1e-9, `zig W${W} L${L} C${C}: tegnet skal være partial og ≤ kæde`);
+    const c = T.calcSnake(W, L, C, false), d = T.calcPolySnake(R, C, 0);
+    if (!c.partial) ok(near(c.used, d.used, 1e-6) && c.hooks.length === d.hooks.length && c.spans.length === d.spans.length,
+      `slange W${W} L${L} C${C}: ${c.used}/${c.hooks.length}/${c.spans.length} vs ${d.used}/${d.hooks.length}/${d.spans.length}`);
+    else ok(d.partial, `slange W${W} L${L} C${C}: rektangel partial, tegnet ikke`);
+  }
+  for (const P of [15, 40, 100]) {
+    const a = T.calcZig(W, L, 0, false, Math.max(1, Math.round(200 * L / P))), b = T.calcPolyZig(R, 0, P / 100);
+    ok(near(a.used, b.used, 1e-6), `zig afstand W${W} L${L} P${P}: ${a.used} vs ${b.used}`);
+    const c = T.calcSnake(W, L, 0, false, Math.max(1, Math.round(100 * W / P))), d = T.calcPolySnake(R, 0, P / 100);
+    ok(near(c.used, d.used, 1e-6), `slange afstand W${W} L${L} P${P}: ${c.used} vs ${d.used}`);
+  }
+}
+
+// Zoner: L-rum giver 2 konvekse zoner, U giver 3, rektangel 1
+ok(T.sweepCells([[0, 0], [5, 0], [5, 3], [0, 3]]).length === 1, 'rektangel = 1 zone');
+ok(T.sweepCells([[0, 0], [6, 0], [6, 2], [3, 2], [3, 5], [0, 5]]).length === 2, 'L = 2 zoner');
+ok(T.sweepCells([[0, 0], [5, 0], [5, 4], [4, 4], [4, 1], [1, 1], [1, 4], [0, 4]]).length === 3, 'U = 3 zoner');
+ok(T.sweepCells([[0, 0], [6, 0], [6, 2], [3.5, 4], [0, 4]]).length === 1, 'skrå væg (konveks) = 1 zone');
+
 // 3) Alle rum × mønstre: kroge inde, budget overholdt, sammenhængende kæde
 console.log('Rum × mønstre');
 function checkRes(res, P, C, label, budget) {
   ok(!res.error, `${label}: uventet fejl "${res.error}"`);
   if (res.error) return;
   ok(res.hooks.every(h => T.pointInPoly(h, P, 1e-6)), `${label}: krog uden for rummet`);
-  for (const sh of res.shapes) ok(sh.points.every(p => T.pointInPoly(p, P, 1e-6)), `${label}: kæde uden for rummet`);
+  for (const sh of res.shapes) {
+    ok(sh.points.every(p => T.pointInPoly(p, P, 1e-6)), `${label}: kæde-punkt uden for rummet`);
+    // hvert stræk skal ligge inde i rummet: ingen krydsning af væg og prøvepunkter indenfor
+    let segOk = true;
+    for (let i = 0; i < sh.points.length - 1 && segOk; i++) {
+      const a = sh.points[i], b = sh.points[i + 1];
+      for (const f of [0.25, 0.5, 0.75]) if (!T.pointInPoly([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f], P, 1e-6)) segOk = false;
+      for (let j = 0; j < P.length && segOk; j++) if (T.segsCross(a, b, P[j], P[(j + 1) % P.length])) segOk = false;
+    }
+    ok(segOk, `${label}: stræk går uden for rummet`);
+  }
   if (budget) ok(res.used <= C + 1e-6, `${label}: brugt ${res.used} > kæde ${C}`);
   ok(res.spans.every(s => s > 0 && isFinite(s)), `${label}: ugyldige stræk`);
   ok(res.used > 0, `${label}: intet forbrug`);
@@ -94,6 +134,13 @@ for (const [name, P] of Object.entries(ROOMS)) {
   const all = P.map(() => true);
   for (const C of [3, 15, 40, 120]) {
     checkRes(T.calcPolySpiral(P, C, 0), P, C, `${name} spiral C${C}`, true);
+    for (const rot of [0, 1]) {
+      T.S.rot = rot;
+      checkRes(T.calcPolyZig(P, C, 0), P, C, `${name} zigzag rot${rot} C${C}`, true);
+      checkRes(T.calcPolySnake(P, C, 0), P, C, `${name} slange rot${rot} C${C}`, true);
+      ok(T.calcPolyZig(P, C, 0).shapes.length === 1 && T.calcPolySnake(P, C, 0).shapes.length === 1, `${name} rot${rot}: én sammenhængende kæde`);
+    }
+    T.S.rot = 0;
     for (const e of [0, 0.1, 0.3]) checkRes(T.calcPolyEdge(P, C, 0, all, e), P, C, `${name} kant(alle) e${e} C${C}`, true);
     const some = P.map((_, i) => i < 2);
     checkRes(T.calcPolyEdge(P, C, 0, some, 0.1), P, C, `${name} kant(A+B) C${C}`, true);
@@ -101,6 +148,12 @@ for (const [name, P] of Object.entries(ROOMS)) {
   for (const sp of [0.2, 0.5, 1]) {
     checkRes(T.calcPolySpiral(P, 0, sp), P, 0, `${name} spiral afstand ${sp}`, false);
     checkRes(T.calcPolyEdge(P, 0, sp, all, 0.1), P, 0, `${name} kant afstand ${sp}`, false);
+    for (const rot of [0, 1]) {
+      T.S.rot = rot;
+      checkRes(T.calcPolyZig(P, 0, sp), P, 0, `${name} zigzag rot${rot} afstand ${sp}`, false);
+      checkRes(T.calcPolySnake(P, 0, sp), P, 0, `${name} slange rot${rot} afstand ${sp}`, false);
+    }
+    T.S.rot = 0;
   }
   // Følg væggene: hele vejen rundt uden afstand = rummets omkreds; én kæde (ét stykke)
   const r = T.calcPolyEdge(P, 1000, 0, all, 0);
@@ -156,7 +209,7 @@ console.log('Røgtest af update()');
   const run = label => { try { T.update(); passes++; } catch (e) { fails++; console.log('  FEJL i update():', label, e.stack.split('\n').slice(0, 3).join(' | ')); } };
   for (const surface of ['loft', 'vaeg']) for (const shape of ['rect', 'poly']) {
     S.surface = surface; S.shape = shape; S.room = null; S.mode = 'zz'; T.applyShape();
-    const modes = surface === 'vaeg' ? ['tree', 'wzig', 'curtain'] : shape === 'poly' ? ['spiral', 'edge'] : ['zig', 'dia', 'snake', 'spiral'];
+    const modes = surface === 'vaeg' ? ['tree', 'wzig', 'curtain'] : shape === 'poly' ? ['zig', 'snake', 'spiral', 'edge'] : ['zig', 'dia', 'snake', 'spiral'];
     for (const mode of modes) for (const calcBy of ['kaede', 'afstand']) for (const G of [0, 10]) {
       S.mode = mode; S.calcBy = calcBy; S.G = G;
       if (shape === 'poly' && surface === 'loft') for (const [name, P] of Object.entries(ROOMS)) {
