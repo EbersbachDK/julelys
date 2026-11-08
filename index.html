@@ -97,6 +97,22 @@
   footer .credit { margin:14px 0 0; padding-top:12px; border-top:1px solid var(--line); text-align:center; }
   footer .credit a { color:inherit; }
 
+  /* Tegn selv-rum */
+  .walllist { display:flex; flex-direction:column; gap:6px; margin-top:4px; }
+  .wallrow { display:flex; align-items:center; gap:8px; }
+  .wallrow .wtag { width:26px; height:26px; flex:none; display:grid; place-items:center; border-radius:8px; background:var(--green-soft); color:var(--green); font-weight:700; font-size:.85rem; }
+  .wallrow input[type=number] { width:84px; text-align:center; font-family:var(--body); font-size:.95rem; padding:6px; border:1px solid var(--line); border-radius:9px; background:var(--panel2); color:var(--ink); font-variant-numeric:tabular-nums; }
+  .wallrow label { display:flex; align-items:center; gap:5px; font-size:.85rem; color:var(--muted); margin:0 0 0 auto; cursor:pointer; }
+  .wallrow input[type=checkbox] { width:18px; height:18px; accent-color:var(--green); }
+  .editbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:6px 0 4px; }
+  .editbar[hidden] { display:none; }
+  .editbar button { border:1px solid var(--line); background:var(--panel2); color:var(--ink); font-family:var(--body); font-size:.85rem; font-weight:600; padding:7px 12px; border-radius:10px; cursor:pointer; }
+  .editbar button:hover:not(:disabled) { border-color:var(--green); }
+  .editbar button:disabled { opacity:.45; cursor:default; }
+  .editbar .hint { margin:0; flex:1 1 220px; }
+  #plan .edit { touch-action:none; cursor:grab; }
+  #plan .wallhit { cursor:pointer; }
+
   .mtable { width:100%; border-collapse:collapse; font-size:.86rem; font-variant-numeric:tabular-nums; margin:2px 0 6px; }
   .mtable th, .mtable td { text-align:left; padding:6px 9px; border-bottom:1px solid var(--line); }
   .mtable th { color:var(--muted); font-weight:600; font-size:.76rem; text-transform:uppercase; letter-spacing:.04em; }
@@ -128,7 +144,7 @@
     * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     body { background:#fff; }
     .wrap { max-width:none; padding:0; }
-    header, #controls, .hint, .footerweb { display:none !important; }
+    header, #controls, .hint, .footerweb, .editbar, #plan .edit, #plan .wallhit { display:none !important; }
     #printhead { display:block !important; margin-bottom:16px; }
     .grid { display:block; }
     .vizwrap { gap:14px; }
@@ -165,7 +181,21 @@
         </div>
       </div>
 
-      <div class="field">
+      <div class="field" id="shapeField">
+        <label>Rumform</label>
+        <div class="toggle" id="shapeToggle" role="group" aria-label="Vælg rumform">
+          <button data-shape="rect" aria-pressed="true">Rektangel</button>
+          <button data-shape="poly" aria-pressed="false">Tegn selv</button>
+        </div>
+        <p class="hint" id="shapeHint" hidden>Træk i hjørnerne på tegningen, tryk <b>+</b> midt på en væg for et nyt hjørne, eller ret væggenes længde herunder.</p>
+      </div>
+
+      <div class="field" id="wallField" hidden>
+        <label>Vægge <span class="val" id="vArea"></span></label>
+        <div class="walllist" id="wallList"></div>
+      </div>
+
+      <div class="field" id="fieldW">
         <label for="rW"><span id="lblW">Bredde</span> <span class="val" id="vW">1,0 m</span></label>
         <input type="range" id="rW" min="0.3" max="20" step="0.1" value="1">
         <div class="stepper">
@@ -176,7 +206,7 @@
         </div>
       </div>
 
-      <div class="field">
+      <div class="field" id="fieldL">
         <label for="rL"><span id="lblL">Længde</span> <span class="val" id="vL">4,0 m</span></label>
         <input type="range" id="rL" min="1" max="20" step="0.1" value="4">
         <div class="stepper">
@@ -258,6 +288,18 @@
         <p class="hint" id="hint"></p>
       </div>
 
+      <div class="field" id="fieldE" hidden>
+        <label for="rE">Afstand fra væggen <span class="val" id="vE">10 cm</span></label>
+        <input type="range" id="rE" min="0" max="50" step="1" value="10">
+        <div class="stepper">
+          <button data-t="E" data-d="-1" aria-label="mindre">−</button>
+          <input type="number" id="nE" min="0" max="50" step="1" value="10">
+          <button data-t="E" data-d="1" aria-label="mere">+</button>
+          <span class="unit">cm</span>
+        </div>
+        <p class="hint">Hvor langt fra væggen kæden hænger. Vælg vægge med fluebenene ovenfor eller ved at trykke på væggen i tegningen — de valgte vægge skal hænge sammen.</p>
+      </div>
+
       <div class="field" id="midField" hidden>
         <label>Krog midt på trækket <span class="val" id="vMid">Nej</span></label>
         <div class="toggle" id="midToggle" role="group" aria-label="Krog i midten af trækket">
@@ -276,6 +318,11 @@
           <div id="note2" class="note2" hidden></div>
         </div>
         <svg id="plan" viewBox="-40 -30 480 200" role="img" aria-label="Plantegning af rummet med lyskæde"></svg>
+        <div class="editbar" id="editbar" hidden>
+          <button type="button" id="delVBtn" disabled>Slet valgt hjørne</button>
+          <button type="button" id="resetRoomBtn">Nulstil til rektangel</button>
+          <p class="hint" id="editHint">Træk i hjørnerne · tryk <b>+</b> for nyt hjørne · tryk på et hjørne for at vælge det.</p>
+        </div>
         <p class="cap" id="cap"></p>
         <div id="sidewrap" hidden>
           <h2 style="font-size:1rem;margin:18px 0 6px">Nedhæng <span class="unit" style="font-weight:400">· set fra siden</span></h2>
@@ -308,10 +355,10 @@
 
 <script>
   const NS="http://www.w3.org/2000/svg";
-  const S = { W:1, L:4, C:40, N:400, G:10, P:20, bulb:1.5, surface:'loft', mode:'zig', mid:false, calcBy:'kaede' };
-  const STEP = { W:0.1, L:0.1, C:1, N:10, G:1, P:1 };
-  const MIN = { W:0.3, L:1, C:1, N:1, G:0, P:2 };
-  const MAX = { W:20, L:20, C:200, N:3000, G:40, P:300 };
+  const S = { W:1, L:4, C:40, N:400, G:10, P:20, E:10, bulb:1.5, surface:'loft', shape:'rect', room:null, sel:[], selV:null, mode:'zig', mid:false, calcBy:'kaede' };
+  const STEP = { W:0.1, L:0.1, C:1, N:10, G:1, P:1, E:1 };
+  const MIN = { W:0.3, L:1, C:1, N:1, G:0, P:2, E:0 };
+  const MAX = { W:20, L:20, C:200, N:3000, G:40, P:300, E:50 };
 
   const nf = (x,d=0)=> (isFinite(x)?x:0).toLocaleString('da-DK',{minimumFractionDigits:d,maximumFractionDigits:d});
   const plen = pts => { let t=0; for(let i=0;i<pts.length-1;i++) t+=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]); return t; };
@@ -340,21 +387,22 @@
     spiral:'Rammer ind mod midten — flot om en lampe eller midterpunkt i loftet.',
     tree:   'Lys i et juletræ på væggen — sæt bredde og højde, så fyldes trekanten med rækker.',
     wzig:   'Zigzag ned ad væggen mellem de to sider — enkelt og festligt.',
-    curtain:'Lodrette strenge som et lysgardin ned ad væggen.'
+    curtain:'Lodrette strenge som et lysgardin ned ad væggen.',
+    edge:   'Kæden følger de valgte vægge rundt i kanten af loftet — vælg selv hvilke.'
   };
   const MODE_LABEL = {
     zig:'Zigzag', dia:'Diamant', snake:'Slange', spiral:'Spiral',
-    tree:'Juletræ', wzig:'Zigzag', curtain:'Gardin'
+    tree:'Juletræ', wzig:'Zigzag', curtain:'Gardin', edge:'Følg væggene'
   };
   // Afstands-mode: hvad afstanden hedder, og hvordan den omsættes til antal (stræk/baner/ringe/rækker/strenge).
   const SPACING_LABEL = {
     zig:'Afstand mellem kroge', dia:'Afstand mellem kroge', wzig:'Afstand mellem kroge',
     snake:'Afstand mellem baner', spiral:'Afstand mellem ringe',
-    tree:'Afstand mellem rækker', curtain:'Afstand mellem strenge'
+    tree:'Afstand mellem rækker', curtain:'Afstand mellem strenge', edge:'Afstand mellem kroge'
   };
   const SPACING_WORD = {
     zig:'kroge', dia:'kroge', wzig:'kroge',
-    snake:'baner', spiral:'ringe', tree:'rækker', curtain:'strenge'
+    snake:'baner', spiral:'ringe', tree:'rækker', curtain:'strenge', edge:'kroge'
   };
   // P i cm -> antal (afrundes og clampes i update)
   const countFromSpacing = {
@@ -373,7 +421,8 @@
     spiral:'Rammer udefra og ind · prikker = kroge i hjørnerne.',
     tree:   'Guld = kæden i rækker · prikker = kroge langs træets kant og top.',
     wzig:   'Guld = kæden · prikker = kroge i siderne.',
-    curtain:'Guld = kæden i lodrette strenge · prikker = kroge (ca. hver meter).'
+    curtain:'Guld = kæden i lodrette strenge · prikker = kroge (ca. hver meter).',
+    edge:   'Guld = kæden langs de valgte vægge (fremhævet) · prikker = kroge.'
   };
   const SURFACES = {
     loft: { title:'Rummets størrelse', planTitle:'Plantegning', planView:'· set ovenfra',
@@ -582,6 +631,186 @@
   const CALC = { zig:calcZig, dia:calcDia, snake:calcSnake, spiral:calcSpiral,
     tree:calcTree, wzig:calcWallZig, curtain:calcCurtain };
 
+  // ---------- Tegn selv: polygon-geometri ----------
+  // Rum som liste af hjørner [x,y] i meter (x = længde, y = bredde — samme akser som loft-plantegningen).
+  const polyArea = P => { let a=0; for(let i=0;i<P.length;i++){ const p=P[i], q=P[(i+1)%P.length]; a+=p[0]*q[1]-q[0]*p[1]; } return a/2; };
+  const polyPerim = P => { let t=0; for(let i=0;i<P.length;i++){ const p=P[i], q=P[(i+1)%P.length]; t+=Math.hypot(q[0]-p[0],q[1]-p[1]); } return t; };
+  const wallLen = (P,i)=>{ const p=P[i], q=P[(i+1)%P.length]; return Math.hypot(q[0]-p[0],q[1]-p[1]); };
+  const closeRing = R => R.concat([R[0]]);
+  const cross2 = (o,a,b)=> (a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+  function segsCross(a,b,c,d){            // ægte krydsning (ikke kun fælles endepunkt)
+    const d1=cross2(c,d,a), d2=cross2(c,d,b), d3=cross2(a,b,c), d4=cross2(a,b,d);
+    return ((d1>1e-12&&d2<-1e-12)||(d1<-1e-12&&d2>1e-12)) && ((d3>1e-12&&d4<-1e-12)||(d3<-1e-12&&d4>1e-12));
+  }
+  function polySimple(P){
+    const n=P.length; if(n<3) return false;
+    for(let i=0;i<n;i++) if(wallLen(P,i)<1e-6) return false;
+    for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
+      if(j===i+1 || (i===0 && j===n-1)) continue;          // naboer deler hjørne
+      if(segsCross(P[i],P[(i+1)%n],P[j],P[(j+1)%n])) return false;
+    }
+    return true;
+  }
+  function roomCheck(P){
+    if(!P || P.length<3) return {ok:false, msg:'Rummet skal have mindst 3 hjørner.'};
+    if(!polySimple(P)) return {ok:false, msg:'Væggene krydser hinanden — træk hjørnerne, så rummet får en lukket form uden krydsninger.'};
+    if(Math.abs(polyArea(P))<0.25) return {ok:false, msg:'Rummet er for lille — gør det mindst 0,25 m².'};
+    return {ok:true};
+  }
+  function onSeg(p,a,b,tol){ const L=Math.hypot(b[0]-a[0],b[1]-a[1]); if(L<1e-12) return Math.hypot(p[0]-a[0],p[1]-a[1])<=tol;
+    const t=((p[0]-a[0])*(b[0]-a[0])+(p[1]-a[1])*(b[1]-a[1]))/(L*L); if(t<-1e-9||t>1+1e-9) return false;
+    return Math.abs(cross2(a,b,p))/L<=tol; }
+  function pointInPoly(p,P,tol=1e-6){
+    let inside=false; const n=P.length;
+    for(let i=0,j=n-1;i<n;j=i++){
+      if(onSeg(p,P[j],P[i],tol)) return true;
+      const xi=P[i][0], yi=P[i][1], xj=P[j][0], yj=P[j][1];
+      if(((yi>p[1])!==(yj>p[1])) && (p[0] < (xj-xi)*(p[1]-yi)/(yj-yi)+xi)) inside=!inside;
+    }
+    return inside;
+  }
+  // Væglinje i forskudt indad med afstand e: {p (punkt), d (enhedsretning), n (indad-normal)}
+  function offLine(P,i,e){
+    const s = polyArea(P)>0 ? 1 : -1, a=P[i], b=P[(i+1)%P.length], L=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    const d=[(b[0]-a[0])/L,(b[1]-a[1])/L], n=[-d[1]*s, d[0]*s];
+    return { p:[a[0]+n[0]*e, a[1]+n[1]*e], q:[b[0]+n[0]*e, b[1]+n[1]*e], d, n };
+  }
+  // Skæring mellem to linjer; parallelle → null
+  function lineX(A,B){
+    const den=A.d[0]*B.d[1]-A.d[1]*B.d[0]; if(Math.abs(den)<1e-9) return null;
+    const t=((B.p[0]-A.p[0])*B.d[1]-(B.p[1]-A.p[1])*B.d[0])/den;
+    return [A.p[0]+A.d[0]*t, A.p[1]+A.d[1]*t];
+  }
+  // Hjørne mellem væg i-1 og væg i (forskudt e). Lige linje (parallelle) → det forskudte hjørnepunkt.
+  const joint = (P,i,e)=>{ const n=P.length, A=offLine(P,(i-1+n)%n,e), B=offLine(P,i,e); return lineX(A,B) || B.p; };
+  // Hele rummet skrumpet ind med e. null hvis formen vender/kollapser/krydser.
+  function insetPoly(P,e){
+    if(e<=0) return P.map(p=>p.slice());
+    const n=P.length, R=[];
+    for(let i=0;i<n;i++) R.push(joint(P,i,e));
+    for(let i=0;i<n;i++){ const a=P[i], b=P[(i+1)%n], c=R[i], d=R[(i+1)%n];
+      if((b[0]-a[0])*(d[0]-c[0])+(b[1]-a[1])*(d[1]-c[1]) <= 1e-9) return null; }   // væg vendt/forsvundet
+    if(!polySimple(R) || polyArea(R)*polyArea(P)<=0) return null;
+    return R;
+  }
+  function maxInset(P){
+    let lo=0, hi=Math.sqrt(Math.abs(polyArea(P)))+polyPerim(P);
+    for(let it=0;it<50;it++){ const m=(lo+hi)/2; if(insetPoly(P,m)) lo=m; else hi=m; }
+    return Math.round(lo*1e4)/1e4;        // 0,1 mm — fjerner bisektionens støj (rektangel giver præcis min/2)
+  }
+  // Krogpunkter langs en sti: knækpunkter + mellemkroge (pieces(len) stk. stræk pr. stykke)
+  function hooksAlong(pts, pieces){
+    const hooks=[pts[0]], spans=[];
+    for(let i=0;i<pts.length-1;i++){ const a=pts[i], b=pts[i+1], L=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      if(L<1e-9) continue;
+      const k=Math.max(1,pieces(L));
+      for(let j=1;j<=k;j++) hooks.push([a[0]+(b[0]-a[0])*j/k, a[1]+(b[1]-a[1])*j/k]);
+      for(let j=0;j<k;j++) spans.push(L/k);
+    }
+    return {hooks, spans};
+  }
+  const polyErr = msg => ({ error:msg, shapes:[], hooks:[], used:0, spans:[], stats:[], spacing:999, partial:false, reach:null });
+
+  // Spiral i frit rum: ringe = omridset skrumpet ind i trin af d.
+  function calcPolySpiral(P,C,spacingM){
+    const D=maxInset(P);
+    const ringsFor = d => { const rings=[]; for(let i=0;i<200;i++){ const off=i*d; if(off>=D-1e-9) break;
+      const R=insetPoly(P,off); if(!R) break; rings.push(R); } return rings; };
+    let ch=null;
+    if(spacingM){ const k=Math.max(1,Math.round(D/spacingM)); const rings=ringsFor(D/k);
+      ch={k:rings.length, d:D/k, rings, total:rings.reduce((t,R)=>t+polyPerim(R),0)}; }
+    else for(let k=1;k<=60;k++){
+      const rings=ringsFor(D/k), total=rings.reduce((t,R)=>t+polyPerim(R),0);
+      if(total<=C) ch={k:rings.length, d:D/k, rings, total}; else break;
+    }
+    const outer=polyPerim(P);
+    if(!ch){   // ikke nok til én ring: følg yderkanten så langt kæden rækker
+      const t=truncate(closeRing(P), C);
+      return { shapes:[{points:t.pts,color:'var(--gold)'}], hooks:P.map(p=>p.slice()), used:t.used, spacing:999,
+        partial:true, reach:null, spans:segLens(t.pts),
+        stats:[{n:'<1',l:'Ringe'},{n:nf(outer,1)+'<small> m</small>',l:'Yderste omkreds'},{n:nf(P.length),l:'Kroge (hjørner)'}] };
+    }
+    const shapes=[], hooks=[], spans=[];
+    ch.rings.forEach((R,i)=>{ shapes.push({points:closeRing(R), color:i%2?'var(--green)':'var(--gold)'});
+      R.forEach(p=>hooks.push(p)); for(let j=0;j<R.length;j++) spans.push(wallLen(R,j)); });
+    return { shapes, hooks, used:ch.total, spacing:ch.d*100, partial:false, reach:null, spans,
+      stats:[
+        {n:nf(ch.k), l:'Ringe (ind mod midten)'},
+        {n:nf(outer,1)+'<small> m</small>', l:'Yderste omkreds'},
+        {n:nf(hooks.length), l:'Kroge (hjørner)'},
+        {n:nf(ch.d*100,0)+'<small> cm</small>', l:'Afstand mellem ringe'},
+      ]};
+  }
+
+  // Valgte vægge som én sammenhængende kæde: {start, count, closed} eller {error}
+  function wallRun(sel,n){
+    const cnt=sel.filter(Boolean).length;
+    if(!cnt) return {error:'Vælg mindst én væg, kæden skal følge.'};
+    if(cnt===n) return {start:0, count:n, closed:true};
+    let starts=0, start=-1;
+    for(let i=0;i<n;i++) if(sel[i] && !sel[(i-1+n)%n]){ starts++; start=i; }
+    if(starts!==1) return {error:'De valgte vægge skal hænge sammen — vælg vægge, der sidder i forlængelse af hinanden.'};
+    return {start, count:cnt, closed:false};
+  }
+  // Følg væggene: kæden hænger langs de valgte vægge, e meter inde fra væggen.
+  function calcPolyEdge(P,C,spacingM,sel,e){
+    const n=P.length, run=wallRun(sel,n);
+    if(run.error) return polyErr(run.error);
+    let path;
+    if(run.closed){ const R=insetPoly(P,e); if(!R) return polyErr('Afstanden fra væggen er for stor til rummet — gør den mindre.'); path=closeRing(R); }
+    else { path=[]; for(let j=0;j<=run.count;j++) path.push(joint(P,(run.start+j)%n,e)); }
+    if(path.some(p=>!pointInPoly(p,P,1e-6))) return polyErr('Afstanden fra væggen er for stor til rummet — gør den mindre.');
+    const full=plen(path);
+    let pts=path, used=full, partial=false;
+    if(!spacingM && C<full-1e-9){ const t=truncate(path,C); pts=t.pts; used=t.used; partial=true; }
+    const hs = spacingM || 1;
+    const {hooks, spans} = hooksAlong(pts, L=> spacingM ? Math.ceil(L/hs-1e-9) : Math.round(L/hs));
+    if(run.closed && !partial) hooks.pop();          // sidste = første
+    return { shapes:[{points:pts,color:'var(--gold)'}], hooks, used, spacing:999, partial, reach:null, spans,
+      stats:[
+        {n:nf(run.count), l:run.closed?'Vægge (hele vejen rundt)':'Vægge fulgt'},
+        {n:nf(full,1)+'<small> m</small>', l:'Længde langs væggene'},
+        {n:nf(hooks.length), l:'Kroge i alt'},
+        {n:nf(spans.length?Math.max(...spans)*100:0,0)+'<small> cm</small>', l:'Afstand mellem kroge (max)'},
+        {n:nf(e*100,0)+'<small> cm</small>', l:'Afstand fra væggen'},
+      ]};
+  }
+  const CALC_POLY = {
+    spiral:(P,C,sp)=> calcPolySpiral(P,C,sp),
+    edge:  (P,C,sp)=> calcPolyEdge(P,C,sp,S.sel,S.E/100)
+  };
+
+  // ---------- Tegn selv: redigering ----------
+  const rectRoom = ()=> [[0,0],[S.L,0],[S.L,S.W],[0,S.W]];
+  const r3 = v => Math.round(v*1000)/1000;
+  function normalizeRoom(){
+    const P=S.room; let mx=Infinity, my=Infinity;
+    P.forEach(p=>{ mx=Math.min(mx,p[0]); my=Math.min(my,p[1]); });
+    S.room=P.map(p=>[r3(p[0]-mx), r3(p[1]-my)]);
+  }
+  // Ny længde på væg i: næste hjørne glider langs væggen, og hjørnet efter følger med (næste væg beholder sin vinkel).
+  function setWallLen(i,len){
+    const P=S.room, n=P.length, L0=wallLen(P,i); if(L0<1e-9 || !(len>0)) return;
+    const a=P[i], b=P[(i+1)%n], dl=len-L0, dx=(b[0]-a[0])/L0*dl, dy=(b[1]-a[1])/L0*dl;
+    const j=(i+1)%n, k=(i+2)%n;
+    P[j]=[P[j][0]+dx, P[j][1]+dy];
+    if(k!==i) P[k]=[P[k][0]+dx, P[k][1]+dy];
+    normalizeRoom();
+  }
+  function insertVertex(i){        // nyt hjørne midt på væg i
+    const P=S.room, n=P.length, a=P[i], b=P[(i+1)%n];
+    P.splice(i+1,0,[r3((a[0]+b[0])/2), r3((a[1]+b[1])/2)]);
+    S.sel.splice(i+1,0,S.sel[i]);
+  }
+  function deleteVertex(i){
+    const P=S.room, n=P.length; if(n<=3) return;
+    const merged = S.sel[(i-1+n)%n] || S.sel[i];
+    P.splice(i,1); S.sel.splice(i,1);
+    S.sel[i===0 ? n-2 : i-1] = merged;
+    normalizeRoom();
+  }
+  const isPoly = ()=> S.surface==='loft' && S.shape==='poly';
+
   // ---------- tegning ----------
   const svg = document.getElementById('plan');
   const el = (name,a)=>{const e=document.createElementNS(NS,name);for(const k in a)e.setAttribute(k,a[k]);return e;};
@@ -606,7 +835,74 @@
       p+=(i?'L':'M')+(cx+rr*Math.cos(a)).toFixed(1)+' '+(cy+rr*Math.sin(a)).toFixed(1); }
     return p+'Z';
   }
+  function drawChain(res, scale, ledTotal){
+    const totalLen = res.used>0?res.used:1;
+    res.shapes.forEach(sh=>{
+      const pts=sh.points.map(([x,y])=>[x*scale,y*scale]);
+      const d=pts.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
+      svg.appendChild(el('path',{d,fill:'none',stroke:'var(--gold-glow)','stroke-width':6,'stroke-linejoin':'round','stroke-linecap':'round',opacity:.3}));
+      svg.appendChild(el('path',{d,fill:'none',stroke:sh.color,'stroke-width':2.4,'stroke-linejoin':'round','stroke-linecap':'round'}));
+      dots(pts, Math.round(ledTotal * plen(sh.points)/totalLen));
+    });
+    res.hooks.forEach(([x,y])=> svg.appendChild(el('circle',{cx:(x*scale).toFixed(1),cy:(y*scale).toFixed(1),r:3.2,fill:'var(--panel)',stroke:'var(--green)','stroke-width':2})));
+  }
+  // Tegn selv: rummet som polygon + gitter, væg-mål og redigerings-håndtag.
+  let view=null, frozenView=null;          // {scale, vb:[x,y,w,h]} — låses mens man trækker
+  function drawPoly(res, ledTotal){
+    clear();
+    const P=S.room, n=P.length;
+    if(frozenView) view=frozenView;
+    else {
+      let mx=0,my=0; P.forEach(p=>{ mx=Math.max(mx,p[0]); my=Math.max(my,p[1]); });
+      const scale=400/Math.max(mx,my,1);
+      // u = SVG-enheder pr. skærm-pixel → tekst og touch-håndtag får samme fysiske størrelse på mobil og PC
+      const cw=(svg.getBoundingClientRect && svg.getBoundingClientRect().width) || 520;
+      const M=Math.min(75, cw*0.17), u=Math.max(1, 400/Math.max(100, cw-2*M));
+      view={scale, u, vb:[-M*u,-40*u,mx*scale+2*M*u,my*scale+80*u]};
+    }
+    const sc=view.scale, vb=view.vb, u=view.u;
+    svg.setAttribute('viewBox', vb.map(v=>v.toFixed(1)).join(' '));
+    // gitter (1 m) — hjælp til at tegne
+    const g0x=Math.ceil(vb[0]/sc), g1x=Math.floor((vb[0]+vb[2])/sc), g0y=Math.ceil(vb[1]/sc), g1y=Math.floor((vb[1]+vb[3])/sc);
+    if((g1x-g0x)+(g1y-g0y)<120){
+      for(let x=g0x;x<=g1x;x++) svg.appendChild(el('line',{class:'grid',x1:x*sc,y1:vb[1],x2:x*sc,y2:vb[1]+vb[3],stroke:'var(--line)','stroke-width':0.6}));
+      for(let y=g0y;y<=g1y;y++) svg.appendChild(el('line',{class:'grid',x1:vb[0],y1:y*sc,x2:vb[0]+vb[2],y2:y*sc,stroke:'var(--line)','stroke-width':0.6}));
+    }
+    const bad=!!res.invalid, edge=S.mode==='edge';
+    const d=P.map((p,i)=>(i?'L':'M')+(p[0]*sc).toFixed(1)+' '+(p[1]*sc).toFixed(1)).join(' ')+'Z';
+    svg.appendChild(el('path',{d,fill:'var(--green-soft)',stroke:bad?'var(--warn)':'var(--wall)','stroke-width':bad?3:2,'stroke-linejoin':'round'}));
+    // valgte vægge (Følg væggene)
+    if(edge) for(let i=0;i<n;i++) if(S.sel[i]){ const a=P[i], b=P[(i+1)%n];
+      svg.appendChild(el('line',{x1:a[0]*sc,y1:a[1]*sc,x2:b[0]*sc,y2:b[1]*sc,stroke:'var(--green)','stroke-width':5,'stroke-linecap':'round',opacity:.45})); }
+    // væg-mål: bogstav + længde uden for væggen
+    const sgn=polyArea(P)>0?1:-1;
+    for(let i=0;i<n;i++){ const a=P[i], b=P[(i+1)%n], L=wallLen(P,i); if(L<1e-6) continue;
+      const nx=(b[1]-a[1])/L*sgn, ny=-(b[0]-a[0])/L*sgn;          // udad-normal
+      const side=Math.abs(nx)>0.45;                                  // stejl/skrå væg: tekst ved siden af, ikke centreret
+      const off=13*u, mx=(a[0]+b[0])/2*sc+nx*off+(side?Math.sign(nx)*4*u:0), my=(a[1]+b[1])/2*sc+ny*off+4*u;
+      const t=el('text',{x:mx.toFixed(1),y:my.toFixed(1),'text-anchor':side?(nx>0?'start':'end'):'middle',fill:'var(--muted)','font-size':(11*u).toFixed(1),'font-family':'var(--body)'});
+      t.textContent=String.fromCharCode(65+i)+' · '+nf(L,2)+' m'; svg.appendChild(t);
+    }
+    if(!res.error) drawChain(res, sc, ledTotal);
+    // klik-flader på væggene (vælg/fravælg i Følg væggene)
+    if(edge) for(let i=0;i<n;i++){ const a=P[i], b=P[(i+1)%n];
+      svg.appendChild(el('line',{class:'wallhit','data-w':i,x1:a[0]*sc,y1:a[1]*sc,x2:b[0]*sc,y2:b[1]*sc,stroke:'transparent','stroke-width':18*u})); }
+    // "+" midt på væggen = nyt hjørne
+    for(let i=0;i<n;i++){ const a=P[i], b=P[(i+1)%n]; if(wallLen(P,i)*sc<44*u) continue;
+      const cx=(a[0]+b[0])/2*sc, cy=(a[1]+b[1])/2*sc;
+      const gp=el('g',{class:'edit','data-add':i});
+      gp.appendChild(el('circle',{cx,cy,r:14*u,fill:'transparent'}));
+      gp.appendChild(el('circle',{cx,cy,r:7*u,fill:'var(--panel)',stroke:'var(--green)','stroke-width':1.5*u}));
+      gp.appendChild(el('path',{d:`M${cx-3.5*u} ${cy}h${7*u}M${cx} ${cy-3.5*u}v${7*u}`,stroke:'var(--green)','stroke-width':1.6*u}));
+      svg.appendChild(gp); }
+    // hjørne-håndtag
+    P.forEach((p,i)=>{ const gp=el('g',{class:'edit','data-v':i});
+      gp.appendChild(el('circle',{cx:p[0]*sc,cy:p[1]*sc,r:20*u,fill:'transparent'}));
+      gp.appendChild(el('circle',{cx:p[0]*sc,cy:p[1]*sc,r:7*u,fill:S.selV===i?'var(--gold)':'var(--panel)',stroke:'var(--ink)','stroke-width':1.8*u}));
+      svg.appendChild(gp); });
+  }
   function draw(res, ledTotal){
+    if(isPoly()) return drawPoly(res, ledTotal);
     clear();
     const dw=res.domain.w, dh=res.domain.h;
     const scale=400/Math.max(dw,dh), Wpx=dw*scale, Hpx=dh*scale;
@@ -617,14 +913,7 @@
     const tb=el('text',{x:Wpx/2,y:Hpx+24,'text-anchor':'middle',fill:'var(--muted)','font-size':13,'font-family':'var(--body)'}); tb.textContent=nf(dw,1)+' m'; svg.appendChild(tb);
     const tl=el('text',{x:-16,y:Hpx/2,'text-anchor':'middle',fill:'var(--muted)','font-size':13,'font-family':'var(--body)',transform:`rotate(-90 -16 ${Hpx/2})`}); tl.textContent=nf(dh,1)+' m'; svg.appendChild(tl);
 
-    const totalLen = res.used>0?res.used:1;
-    res.shapes.forEach(sh=>{
-      const pts=sh.points.map(([x,y])=>[x*scale,y*scale]);
-      const d=pts.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
-      svg.appendChild(el('path',{d,fill:'none',stroke:'var(--gold-glow)','stroke-width':6,'stroke-linejoin':'round','stroke-linecap':'round',opacity:.3}));
-      svg.appendChild(el('path',{d,fill:'none',stroke:sh.color,'stroke-width':2.4,'stroke-linejoin':'round','stroke-linecap':'round'}));
-      dots(pts, Math.round(ledTotal * plen(sh.points)/totalLen));
-    });
+    drawChain(res, scale, ledTotal);
     // Juletræ: lette vandrette hjælpelinjer ved hver række + målpil for afstand mellem rækker
     if(isTree){
       const {r,d}=res.annotate, dPx=d*scale;
@@ -644,7 +933,6 @@
         t2.textContent='mellem rækker'; svg.appendChild(t2);
       }
     }
-    res.hooks.forEach(([x,y])=> svg.appendChild(el('circle',{cx:(x*scale).toFixed(1),cy:(y*scale).toFixed(1),r:3.2,fill:'var(--panel)',stroke:'var(--green)','stroke-width':2})));
     if(res.star) svg.appendChild(el('path',{d:starPath(res.star[0]*scale,res.star[1]*scale,11),fill:'var(--gold-glow)',stroke:'var(--gold)','stroke-width':1.2,'stroke-linejoin':'round'}));
   }
 
@@ -702,8 +990,8 @@
     { max:150,  word:'Kraftigt',       cls:'warn', txt:'Meget lysende pynt — fylder godt i rummet.' },
     { max:1e9,  word:'Meget kraftigt', cls:'warn', txt:'Nærmer sig rumbelysning — kan blive blændende som pynt.' }
   ];
-  function lightInfo(W,L,N){
-    const area = Math.max(0.01, W*L);        // fladens areal (m²)
+  function lightInfo(areaM2,N){
+    const area = Math.max(0.01, areaM2);     // fladens areal (m²)
     const ledPerM2 = N/area;
     const totalLm = N*S.bulb;
     const lmPerM2 = totalLm/area;
@@ -740,29 +1028,42 @@
     document.getElementById('vG').textContent = (mid && G>0)
       ? `${nf(G,0)} cm → ${nf(G/4,1)} cm` : `${nf(G,0)} cm`;
     const byDist = S.calcBy==='afstand';
-    let res, sagExtra;
-    if (byDist){
+    const poly = isPoly();
+    const roomOk = poly ? roomCheck(S.room) : {ok:true};
+    // calc(C, afstands-mode?) — samme flow for rektangel og tegnet rum
+    const calc = poly
+      ? (C,dist)=> CALC_POLY[mode](S.room, C, dist ? S.P/100 : 0)
+      : (C,dist)=> dist
+          ? CALC[mode](W,L,0,mid, Math.max(1, Math.min(400, Math.round(countFromSpacing[mode](W,L,S.P)))))
+          : CALC[mode](W,L,C,mid);
+    let res, sagExtra=0;
+    if (!roomOk.ok){
+      res = polyErr(roomOk.msg); res.invalid = true;
+    } else if (byDist){
       // Afstands-mode: fast antal udledt af ønsket afstand → anbefal kædelængde (aldrig partial).
-      let n = countFromSpacing[mode](W,L,S.P);
-      n = Math.max(1, Math.min(400, Math.round(n)));
-      res = CALC[mode](W,L,0,mid,n);
+      res = calc(0,true);
       sagExtra = sagExtraOf(res.spans, sagEff);
     } else {
       // Kædelængde-mode: fit mønsteret, træk nedhænget fra budgettet, og fit igen så kæden passer.
-      res = CALC[mode](W,L,C,mid);
+      res = calc(C,false);
       sagExtra = sagExtraOf(res.spans, sagEff);
-      if (sagEff>0 && res.spans){
+      if (sagEff>0 && res.spans && !res.error){
         const eff = Math.max(MIN.C, C - sagExtra);
-        res = CALC[mode](W,L,eff,mid);
+        res = calc(eff,false);
         sagExtra = sagExtraOf(res.spans, sagEff);
       }
     }
     if (!res.domain) res.domain = {w:L, h:W};   // loft-mønstrene: x=længde, y=bredde
     const usedTotal = res.used + sagExtra;
     draw(res, N);
-    drawSide(res.spans, sagEff);
+    drawSide(res.error ? null : res.spans, sagEff);
     treeGuide(res);
-    const lightBand = lightInfo(W, L, N);
+    if (poly){ renderWalls();
+      delBtn.disabled = S.selV==null || S.room.length<=3;
+      document.getElementById('fieldE').hidden = mode!=='edge'; }
+    else document.getElementById('fieldE').hidden = true;
+    const areaM2 = poly ? Math.abs(polyArea(S.room)) : W*L;
+    const lightBand = lightInfo(areaM2, N);
 
     // I afstands-mode er den anbefalede kæde = forbruget; forudfyld kæde-feltet, så man kan skifte tilbage.
     const recommend = Math.ceil(usedTotal);              // vist anbefaling (ikke begrænset)
@@ -782,7 +1083,10 @@
 
     // status
     const st = document.getElementById('status');
-    if (byDist){
+    if (res.error){
+      st.className='status warn';
+      st.innerHTML = `<b>${res.invalid?'Rummet kan ikke beregnes':'Vælg vægge'}</b> — ${res.error}`;
+    } else if (byDist){
       st.className='status ok';
       st.innerHTML = `Med <b>${nf(S.P,0)} cm</b> mellem ${SPACING_WORD[mode]} skal du bruge ca. <b>${nf(usedTotal,1)} m</b> lyskæde` +
         (sagM>0 ? ` (inkl. nedhæng)` : ``) + ` — køb mindst <b>${nf(recommend,0)} m</b>.`;
@@ -802,7 +1106,7 @@
     // "meget tæt"-besked
     const n2 = document.getElementById('note2');
     const sp = res.spacing;
-    if (byDist){
+    if (byDist || res.error){
       n2.hidden=true;
     } else if (!res.partial && sp < 7){
       n2.hidden=false;
@@ -836,6 +1140,7 @@
     // opsummering til PDF/print-udgaven
     const dimTxt = surface==='vaeg'
       ? `Væg ${nf(W,1)} × ${nf(L,1)} m (b×h)`
+      : poly ? `Rum (tegnet) ${nf(areaM2,1)} m², ${S.room.length} vægge`
       : `Rum ${nf(L,1)} × ${nf(W,1)} m`;
     const chainTxt = byDist
       ? `Anbefalet kæde ${nf(recommend,0)} m (${nf(S.P,0)} cm mellem ${SPACING_WORD[mode]})`
@@ -852,14 +1157,14 @@
   function setVal(t,v){
     v = clamp(t, Math.round(v*1000)/1000); S[t]=v;
     const dec=(t==='W'||t==='L')?1:0;
-    const unit = (t==='G'||t==='P')?' cm':((t==='W'||t==='L'||t==='C')?' m':'');
+    const unit = (t==='G'||t==='P'||t==='E')?' cm':((t==='W'||t==='L'||t==='C')?' m':'');
     document.getElementById('v'+t).textContent = nf(v,dec)+unit;
     const r=document.getElementById('r'+t), n=document.getElementById('n'+t);
     if (r && document.activeElement!==r) r.value=v;
     if (n && document.activeElement!==n) n.value=(t==='W'||t==='L')?v.toFixed(1):v;
     update();
   }
-  ['W','L','C','N','G','P'].forEach(t=>{
+  ['W','L','C','N','G','P','E'].forEach(t=>{
     document.getElementById('r'+t).addEventListener('input', e=> setVal(t, parseFloat(e.target.value)));
     document.getElementById('n'+t).addEventListener('input', e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) setVal(t,v); });
   });
@@ -904,7 +1209,7 @@
   }));
   function buildModes(){
     const box = document.getElementById('modeToggle');
-    box.innerHTML = SURFACES[S.surface].modes.map(m=>
+    box.innerHTML = modesFor().map(m=>
       `<button data-mode="${m}" aria-pressed="${m===S.mode?'true':'false'}">${MODE_LABEL[m]}</button>`).join('');
     box.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
       S.mode = b.dataset.mode;
@@ -917,19 +1222,131 @@
     S.surface = b.dataset.surface;
     S.mode = SURFACES[S.surface].def;
     document.querySelectorAll('#surfaceToggle button').forEach(x=> x.setAttribute('aria-pressed', x===b?'true':'false'));
-    buildModes(); applyLabels(); update();
+    applyShape(); update();
   }));
+
+  // ---------- Tegn selv: rumform, vægliste og træk på tegningen ----------
+  const POLY_MODES = ['spiral','edge'];        // v1.8.0: + zigzag og slange
+  function modesFor(){ return isPoly() ? POLY_MODES : SURFACES[S.surface].modes; }
+  function saveRoom(){ try{ localStorage.setItem('julelys.room', JSON.stringify({shape:S.shape, room:S.room, sel:S.sel})); }catch(e){} }
+  function loadRoom(){
+    try{ const o=JSON.parse(localStorage.getItem('julelys.room')||'null');
+      if(o && Array.isArray(o.room) && o.room.length>=3 && o.room.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite))){
+        S.room=o.room; S.sel=o.room.map((_,i)=> !!(o.sel&&o.sel[i])); if(o.shape==='poly') S.shape='poly'; }
+    }catch(e){}
+  }
+  function ensureRoom(){ if(!S.room){ S.room=rectRoom(); S.sel=S.room.map(()=>true); } }
+  function applyShape(){
+    const loft=S.surface==='loft', poly=isPoly();
+    if(poly) ensureRoom();
+    document.getElementById('shapeField').hidden = !loft;
+    document.getElementById('shapeHint').hidden = !poly;
+    document.getElementById('wallField').hidden = !poly;
+    document.getElementById('editbar').hidden = !poly;
+    document.getElementById('fieldW').hidden = poly;
+    document.getElementById('fieldL').hidden = poly;
+    document.querySelectorAll('#shapeToggle button').forEach(x=> x.setAttribute('aria-pressed', x.dataset.shape===S.shape?'true':'false'));
+    if(!modesFor().includes(S.mode)) S.mode = poly ? 'edge' : SURFACES[S.surface].def;
+    S.selV=null; frozenView=null;
+    buildModes(); applyLabels();
+  }
+  document.querySelectorAll('#shapeToggle button').forEach(b=> b.addEventListener('click', ()=>{
+    if(S.shape===b.dataset.shape) return;
+    S.shape=b.dataset.shape; saveRoom();
+    applyShape(); update();
+  }));
+  function renderWalls(){
+    const box=document.getElementById('wallList'), P=S.room, n=P.length, edge=S.mode==='edge';
+    document.getElementById('vArea').textContent = nf(Math.abs(polyArea(P)),1)+' m²';
+    const editing = box.contains(document.activeElement);
+    if(editing && box.children.length===n){       // skriver i et felt: opdatér kun de andre
+      box.querySelectorAll('input[type=number]').forEach((inp,i)=>{ if(inp!==document.activeElement) inp.value=wallLen(P,i).toFixed(2); });
+      return;
+    }
+    box.innerHTML = P.map((_,i)=>`<div class="wallrow"><span class="wtag">${String.fromCharCode(65+i)}</span>`+
+      `<input type="number" min="0.1" max="40" step="0.05" value="${wallLen(P,i).toFixed(2)}" data-wl="${i}" aria-label="Længde af væg ${String.fromCharCode(65+i)}"><span class="unit">m</span>`+
+      (edge?`<label><input type="checkbox" data-ws="${i}" ${S.sel[i]?'checked':''}> følg</label>`:'')+`</div>`).join('');
+  }
+  document.getElementById('wallList').addEventListener('change', e=>{
+    const t=e.target;
+    if(t.dataset.wl!=null){ const v=parseFloat(t.value); if(v>0){ setWallLen(+t.dataset.wl, Math.min(40,v)); t.blur(); } }
+    else if(t.dataset.ws!=null){ S.sel[+t.dataset.ws]=t.checked; }
+    else return;
+    saveRoom(); update();
+  });
+  document.getElementById('resetRoomBtn').addEventListener('click', ()=>{
+    S.room=rectRoom(); S.sel=S.room.map(()=>true); S.selV=null; saveRoom(); update();
+  });
+  const delBtn=document.getElementById('delVBtn');
+  delBtn.addEventListener('click', ()=>{
+    if(S.selV==null) return; deleteVertex(S.selV); S.selV=null; saveRoom(); update();
+  });
+
+  // Træk/tryk på tegningen
+  let drag=null;
+  function svgMeters(e){
+    const m=svg.getScreenCTM(); if(!m || !view) return null;
+    const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(m.inverse());
+    return [p.x/view.scale, p.y/view.scale];
+  }
+  function snapTo(pt,i){
+    const P=S.room, n=P.length, vb=view.vb, sc=view.scale;
+    let x=Math.round(pt[0]*10)/10, y=Math.round(pt[1]*10)/10;
+    for(const j of [(i-1+n)%n,(i+1)%n]){            // fang lige linje til nabohjørnerne
+      if(Math.abs(pt[0]-P[j][0])<0.2) x=P[j][0];
+      if(Math.abs(pt[1]-P[j][1])<0.2) y=P[j][1];
+    }
+    x=Math.min(Math.max(x, vb[0]/sc), (vb[0]+vb[2])/sc);
+    y=Math.min(Math.max(y, vb[1]/sc), (vb[1]+vb[3])/sc);
+    return [x,y];
+  }
+  svg.addEventListener('pointerdown', e=>{
+    if(!isPoly()) return;
+    const t=e.target.closest && e.target.closest('[data-v],[data-add]'); if(!t) return;
+    e.preventDefault();
+    let i;
+    if(t.dataset.add!=null){ insertVertex(+t.dataset.add); i=+t.dataset.add+1; S.selV=i; }
+    else i=+t.dataset.v;
+    frozenView=view;
+    drag={i, x:e.clientX, y:e.clientY, moved:t.dataset.add!=null, added:t.dataset.add!=null, pid:e.pointerId};
+    try{ svg.setPointerCapture(e.pointerId); }catch(_){}
+    if(drag.added) update();
+  });
+  svg.addEventListener('pointermove', e=>{
+    if(!drag || e.pointerId!==drag.pid) return;
+    if(!drag.moved && Math.hypot(e.clientX-drag.x, e.clientY-drag.y)<5) return;
+    drag.moved=true;
+    const m=svgMeters(e); if(!m) return;
+    S.room[drag.i]=snapTo(m, drag.i);
+    update();
+  });
+  function endDrag(e){
+    if(!drag || (e && e.pointerId!==drag.pid)) return;
+    const d=drag; drag=null; frozenView=null;
+    if(!d.moved) S.selV = S.selV===d.i ? null : d.i;     // tryk = vælg/fravælg hjørne
+    else if(roomCheck(S.room).ok) normalizeRoom();
+    saveRoom(); update();
+  }
+  svg.addEventListener('pointerup', endDrag);
+  svg.addEventListener('pointercancel', endDrag);
+  svg.addEventListener('click', e=>{          // tryk på væg = vælg/fravælg (Følg væggene)
+    if(!isPoly() || S.mode!=='edge') return;
+    const t=e.target.closest && e.target.closest('[data-w]'); if(!t) return;
+    const i=+t.dataset.w; S.sel[i]=!S.sel[i]; saveRoom(); update();
+  });
 
   document.getElementById('pdfBtn').addEventListener('click', ()=> window.print());
 
   buildModes();
   applyLabels();
-  ['W','L','C','N','G','P'].forEach(t=> setVal(t, S[t]));
+  loadRoom();
+  applyShape();
+  ['W','L','C','N','G','P','E'].forEach(t=> setVal(t, S[t]));
 </script>
 
 <script>
   // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
-  const APP_VERSION = '1.6.1';
+  const APP_VERSION = '1.7.0';
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () =>
       navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));
