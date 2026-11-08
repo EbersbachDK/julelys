@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Julelys-beregner</title>
+<title>Ebersbach's Julelys-beregner</title>
 <meta name="description" content="Beregn og tegn ophæng af lyskæde på loftet — mønster, kroge, længde og nedhæng.">
 <meta name="theme-color" content="#f3f1ea" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#10140f" media="(prefers-color-scheme: dark)">
@@ -94,6 +94,8 @@
   .stat .l { font-size:.78rem; color:var(--muted); margin-top:5px; }
   .cap { color:var(--muted); font-size:.85rem; margin:0; }
   footer { margin-top:26px; color:var(--muted); font-size:.82rem; }
+  footer .credit { margin:14px 0 0; padding-top:12px; border-top:1px solid var(--line); text-align:center; }
+  footer .credit a { color:inherit; }
 
   .mtable { width:100%; border-collapse:collapse; font-size:.86rem; font-variant-numeric:tabular-nums; margin:2px 0 6px; }
   .mtable th, .mtable td { text-align:left; padding:6px 9px; border-bottom:1px solid var(--line); }
@@ -140,14 +142,14 @@
 <div class="wrap">
   <header>
     <p class="eyebrow">Beregner · loft</p>
-    <h1>Julelys-beregner</h1>
+    <h1>Ebersbach's Julelys-beregner</h1>
     <p class="lede">Skriv rummets mål og kædens længde ind, vælg et mønster — så tegner og regner den ophænget, der bruger hele kæden.</p>
     <button id="pdfBtn" class="pdfbtn" type="button">⤓ Gem plan som PDF</button>
   </header>
 
   <div id="printhead">
     <p class="eyebrow">Monteringsplan · loft</p>
-    <h1>Julelys — plan</h1>
+    <h1>Ebersbach's Julelys — plan</h1>
     <p id="printsummary"></p>
   </div>
 
@@ -299,7 +301,9 @@
     </div>
   </div>
 
-  <footer>Målene er cirka — juster afstanden lidt i hjørnerne, så det går pænt op. LED bliver ikke varme og må ligge tæt mod loft og væg.</footer>
+  <footer>Målene er cirka — juster afstanden lidt i hjørnerne, så det går pænt op. LED bliver ikke varme og må ligge tæt mod loft og væg.
+    <p class="credit">Lavet af: Andreas Ebersbach / <a href="https://ebersbach.dk" target="_blank" rel="noopener">Ebersbach.dk</a></p>
+  </footer>
 </div>
 
 <script>
@@ -925,7 +929,7 @@
 
 <script>
   // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
-  const APP_VERSION = '1.6.0';
+  const APP_VERSION = '1.6.1';
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () =>
       navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));
