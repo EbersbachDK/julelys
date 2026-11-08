@@ -38,7 +38,7 @@ const ctx = {
 };
 vm.createContext(ctx);
 vm.runInContext(script + `
-;globalThis.__T = { S, update, calcSpiral, calcDia, calcWallZig, calcPolySpiral, calcPolyEdge, calcZig, calcSnake, calcPolyZig, calcPolySnake, sweepCells, segsCross, polyArea, polyPerim, roomCheck,
+;globalThis.__T = { S, update, calcSpiral, calcDia, calcWallZig, calcStar, starFit, calcPolySpiral, calcPolyEdge, calcZig, calcSnake, calcPolyZig, calcPolySnake, sweepCells, segsCross, polyArea, polyPerim, roomCheck,
   pointInPoly, insetPoly, setWallLen, insertVertex, deleteVertex, wallLen, applyShape, CALC_POLY, isPoly };`, ctx);
 const T = ctx.__T;
 
@@ -118,6 +118,34 @@ for (const [W, L] of [[1, 4], [4, 4], [6, 12], [3, 20], [20, 3]]) for (const C o
   if (d.partial) ok(near(d.used, C, 1e-9) && near(d.spans.reduce((a, b) => a + b, 0), C, 1e-9), `diamant W${W} L${L} C${C}: brugt ${d.used}`);
   const w = T.calcWallZig(W, L, C, mid);
   if (w.partial) ok(near(w.used, C, 1e-9) && w.hooks.every(([x, y]) => x <= W + 1e-9 && y <= L + 1e-9) && inside(w.hooks), `væg-zigzag W${W} L${L} C${C}: brugt ${w.used}`);
+}
+
+// Væg: stjerne
+console.log('Væg: stjerne');
+for (const [W, L] of [[1, 1], [2, 1.5], [1.2, 2.4], [4, 2.5], [0.5, 3]]) {
+  const f = T.starFit(W, L);
+  let prevK = 0;
+  for (const C of [0.5, 2, 5, 10, 25, 60]) {
+    const r = T.calcStar(W, L, C, false);
+    const inBox = r.hooks.concat(...r.shapes.map(sh => sh.points)).every(([x, y]) => x >= -1e-9 && x <= W + 1e-9 && y >= -1e-9 && y <= L + 1e-9);
+    ok(inBox, `stjerne W${W} L${L} C${C}: punkter uden for fladen`);
+    ok(r.used <= C + 1e-9, `stjerne W${W} L${L} C${C}: brugt ${r.used} > kæde`);
+    if (r.partial) ok(near(r.used, C, 1e-9), `stjerne W${W} L${L} C${C}: for kort kæde skal bruge præcis kæden (${r.used})`);
+    else {
+      const k = r.shapes.length;
+      ok(k >= prevK, `stjerne W${W} L${L} C${C}: færre stjerner med længere kæde`);
+      ok(r.hooks.length === 10 * k && r.spans.length === 10 * k, `stjerne W${W} L${L} C${C}: 10 kroge/stræk pr. stjerne`);
+      ok(near(r.spans.reduce((a, b) => a + b, 0), r.used, 1e-9), `stjerne W${W} L${L} C${C}: stræk ≠ forbrug`);
+      prevK = k;
+    }
+  }
+  // fylder fladen: rører enten begge sider eller top+bund
+  const r1 = T.calcStar(W, L, 1000, false, 1), xs = r1.hooks.map(p => p[0]), ys = r1.hooks.map(p => p[1]);
+  const fillsW = near(Math.min(...xs), 0, 1e-9) && near(Math.max(...xs), W, 1e-9), fillsH = near(Math.min(...ys), 0, 1e-9) && near(Math.max(...ys), L, 1e-9);
+  ok(fillsW || fillsH, `stjerne W${W} L${L}: fylder ikke fladen`);
+  // afstands-mode: afstand mellem stjerne-spidser ≈ ønsket afstand
+  const k = Math.max(1, Math.round(100 * f.R / 20)), ra = T.calcStar(W, L, 0, false, k);
+  ok(ra.shapes.length === k && !ra.partial, `stjerne W${W} L${L} afstand: ${ra.shapes.length} stjerner, ventede ${k}`);
 }
 
 // Zoner: L-rum giver 2 konvekse zoner, U giver 3, rektangel 1
@@ -226,7 +254,7 @@ console.log('Røgtest af update()');
   const run = label => { try { T.update(); passes++; } catch (e) { fails++; console.log('  FEJL i update():', label, e.stack.split('\n').slice(0, 3).join(' | ')); } };
   for (const surface of ['loft', 'vaeg']) for (const shape of ['rect', 'poly']) {
     S.surface = surface; S.shape = shape; S.room = null; S.mode = 'zz'; T.applyShape();
-    const modes = surface === 'vaeg' ? ['tree', 'wzig', 'curtain'] : shape === 'poly' ? ['zig', 'snake', 'spiral', 'edge'] : ['zig', 'dia', 'snake', 'spiral'];
+    const modes = surface === 'vaeg' ? ['tree', 'star', 'wzig', 'curtain'] : shape === 'poly' ? ['zig', 'snake', 'spiral', 'edge'] : ['zig', 'dia', 'snake', 'spiral'];
     for (const mode of modes) for (const calcBy of ['kaede', 'afstand']) for (const G of [0, 10]) {
       S.mode = mode; S.calcBy = calcBy; S.G = G;
       if (shape === 'poly' && surface === 'loft') for (const [name, P] of Object.entries(ROOMS)) {

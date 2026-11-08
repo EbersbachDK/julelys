@@ -342,7 +342,7 @@
         <div id="treewrap" hidden>
           <h2 style="font-size:1rem;margin:18px 0 6px">Monteringsmål <span class="unit" style="font-weight:400">· hvor krogene sidder</span></h2>
           <div id="treeguide"></div>
-          <p class="cap">Find midten af fladen og mål lodret op fra gulvet. Hver række har én krog i hver side — sæt dem lige langt ud til hver side fra midterlinjen (± = halv bredde).</p>
+          <p class="cap" id="guidecap"></p>
         </div>
       </div>
       <div class="card">
@@ -398,21 +398,22 @@
     tree:   'Lys i et juletræ på væggen — sæt bredde og højde, så fyldes trekanten med rækker.',
     wzig:   'Zigzag ned ad væggen mellem de to sider — enkelt og festligt.',
     curtain:'Lodrette strenge som et lysgardin ned ad væggen.',
+    star:   'En stor 5-takket stjerne på væggen — rækker kæden, lægges flere stjerner inden i hinanden.',
     edge:   'Kæden følger de valgte vægge rundt i kanten af loftet — vælg selv hvilke.'
   };
   const MODE_LABEL = {
     zig:'Zigzag', dia:'Diamant', snake:'Slange', spiral:'Spiral',
-    tree:'Juletræ', wzig:'Zigzag', curtain:'Gardin', edge:'Følg væggene'
+    tree:'Juletræ', wzig:'Zigzag', curtain:'Gardin', star:'Stjerne', edge:'Følg væggene'
   };
   // Afstands-mode: hvad afstanden hedder, og hvordan den omsættes til antal (stræk/baner/ringe/rækker/strenge).
   const SPACING_LABEL = {
     zig:'Afstand mellem kroge', dia:'Afstand mellem kroge', wzig:'Afstand mellem kroge',
     snake:'Afstand mellem baner', spiral:'Afstand mellem ringe',
-    tree:'Afstand mellem rækker', curtain:'Afstand mellem strenge', edge:'Afstand mellem kroge'
+    tree:'Afstand mellem rækker', curtain:'Afstand mellem strenge', star:'Afstand mellem stjerner (ved spidsen)', edge:'Afstand mellem kroge'
   };
   const SPACING_WORD = {
     zig:'kroge', dia:'kroge', wzig:'kroge',
-    snake:'baner', spiral:'ringe', tree:'rækker', curtain:'strenge', edge:'kroge'
+    snake:'baner', spiral:'ringe', tree:'rækker', curtain:'strenge', star:'stjerner', edge:'kroge'
   };
   // P i cm -> antal (afrundes og clampes i update)
   const countFromSpacing = {
@@ -422,7 +423,8 @@
     snake: (W,L,P)=> 100*W/P,
     curtain:(W,L,P)=> 100*W/P,
     spiral:(W,L,P)=> 50*Math.min(W,L)/P,
-    tree:  (W,L,P)=> 100*L/P
+    tree:  (W,L,P)=> 100*L/P,
+    star:  (W,L,P)=> 100*starFit(W,L).R/P
   };
   const CAPS = {
     zig:   'Guld = kæden · grønne prikker = kroge.',
@@ -432,13 +434,14 @@
     tree:   'Guld = kæden i rækker · prikker = kroge langs træets kant og top.',
     wzig:   'Guld = kæden · prikker = kroge i siderne.',
     curtain:'Guld = kæden i lodrette strenge · prikker = kroge (ca. hver meter).',
-    edge:   'Guld = kæden langs de valgte vægge (fremhævet) · prikker = kroge.'
+    edge:   'Guld = kæden langs de valgte vægge (fremhævet) · prikker = kroge.',
+    star:   'Guld/grøn = stjernerne udefra og ind · prikker = kroge i spidser og indre hjørner.'
   };
   const SURFACES = {
     loft: { title:'Rummets størrelse', planTitle:'Plantegning', planView:'· set ovenfra',
             lblW:'Bredde', lblL:'Længde', modes:['zig','dia','snake','spiral'], def:'zig' },
     vaeg: { title:'Væggens størrelse', planTitle:'Opstalt', planView:'· set forfra',
-            lblW:'Bredde', lblL:'Højde', modes:['tree','wzig','curtain'], def:'tree' }
+            lblW:'Bredde', lblL:'Højde', modes:['tree','star','wzig','curtain'], def:'tree' }
   };
 
   // ---------- ét zigzag-gennemløb med givet kæde-budget ----------
@@ -639,8 +642,45 @@
         {n:nf(s*100,0)+'<small> cm</small>', l:'Afstand mellem strenge'},
       ]};
   }
+  // ---------- væg: stjerne (5 takker, evt. flere inden i hinanden) ----------
+  const STAR_IN = (3-Math.sqrt(5))/2;                     // indre radius / ydre (regulært pentagram ≈ 0,382)
+  const STAR_UNIT = Array.from({length:10},(_,i)=>{ const a=-Math.PI/2+i*Math.PI/5, r=i%2?STAR_IN:1; return [Math.cos(a)*r, Math.sin(a)*r]; });
+  const STAR_BW = 2*Math.cos(Math.PI/10), STAR_BH = 1+Math.cos(Math.PI/5);   // bredde/højde ved radius 1
+  // Største stjerne der passer i fladen (spids opad), centreret. y nedad; gulv ved y=L.
+  function starFit(W,L){
+    const R=Math.min(W/STAR_BW, L/STAR_BH);
+    return { R, cx:W/2, cy:L/2 + R*(1-Math.cos(Math.PI/5))/2 };
+  }
+  const starPts = (f,s)=> STAR_UNIT.map(([x,y])=>[f.cx+x*f.R*s, f.cy+y*f.R*s]);
+  function calcStar(W,L,C,mid,forceN){
+    const f=starFit(W,L), per=plen(closeRing(starPts(f,1)));
+    let k=0;
+    if(forceN) k=Math.max(1,Math.round(forceN));
+    else for(let n=1;n<=60;n++){ if(per*(n+1)/2<=C+1e-9) k=n; else break; }   // stjerne i har størrelse (n-i)/n
+    const base={ domain:{w:W,h:L}, ground:true };
+    if(!k){   // kæden rækker ikke engang én stjerne rundt
+      const t=truncate(closeRing(starPts(f,1)), C);
+      return { ...base, shapes:[{points:t.pts,color:'var(--gold)'}], hooks:starPts(f,1), used:t.used,
+        spacing:f.R*100, partial:true, reach:null, spans:segLens(t.pts),
+        stats:[{n:'<1',l:'Stjerner'},{n:nf(per,1)+'<small> m</small>',l:'Omkreds af stjernen'},{n:nf(t.used,1)+'<small> m</small>',l:'Kæden rækker til'}] };
+    }
+    const shapes=[], hooks=[], spans=[]; let used=0;
+    for(let i=0;i<k;i++){ const sc=(k-i)/k, pts=starPts(f,sc);
+      shapes.push({points:closeRing(pts), color:i%2?'var(--green)':'var(--gold)'});
+      pts.forEach(p=>hooks.push(p)); const sl=segLens(closeRing(pts)); sl.forEach(x=>spans.push(x)); used+=per*sc; }
+    const d=f.R/k;
+    return { ...base, shapes, hooks, used, spacing:d*100, partial:false, reach:null, spans,
+      annotate:{type:'star', k, f, W, L},
+      stats:[
+        {n:nf(k), l:k>1?'Stjerner (inden i hinanden)':'Stjerne'},
+        {n:nf(2*f.R*Math.cos(Math.PI/10),2)+'<small> m</small>', l:'Stjernens bredde'},
+        {n:nf(f.R*STAR_BH,2)+'<small> m</small>', l:'Stjernens højde'},
+        {n:nf(per,1)+'<small> m</small>', l:'Omkreds (yderste)'},
+        {n:nf(hooks.length), l:'Kroge i alt'},
+      ].concat(k>1?[{n:nf(d*100,0)+'<small> cm</small>', l:'Afstand mellem stjerner (ved spidsen)'}]:[])};
+  }
   const CALC = { zig:calcZig, dia:calcDia, snake:calcSnake, spiral:calcSpiral,
-    tree:calcTree, wzig:calcWallZig, curtain:calcCurtain };
+    tree:calcTree, wzig:calcWallZig, curtain:calcCurtain, star:calcStar };
 
   // ---------- Tegn selv: polygon-geometri ----------
   // Rum som liste af hjørner [x,y] i meter (x = længde, y = bredde — samme akser som loft-plantegningen).
@@ -1176,11 +1216,30 @@
     const spt=el('text',{x:200,y:(yTop+dipPx+26).toFixed(1),'text-anchor':'middle',fill:'var(--muted)','font-size':11,'font-family':'var(--body)'}); spt.textContent='stræk ≈ '+nf(rep,1)+' m'; s.appendChild(spt);
   }
 
+  const TREE_CAP = 'Find midten af fladen og mål lodret op fra gulvet. Hver række har én krog i hver side — sæt dem lige langt ud til hver side fra midterlinjen (± = halv bredde).';
   // ---------- juletræ: monteringsmål (højde fra gulv + bredde pr. række) ----------
+  // Stjerne: højde fra gulv + afstand fra midterlinjen for hvert krog-par (op til 4 stjerner som kolonner)
+  function starGuide(res){
+    const {k,f,L}=res.annotate, cols=Math.min(k,4);
+    const groups=[['Topspids',[0]],['Øvre indre hjørner',[1,9]],['Sidespidser',[2,8]],['Nedre indre hjørner',[3,7]],['Nederste indre hjørne',[5]],['Bundspidser',[4,6]]];
+    const cell=(i,s)=>{ const [x,y]=STAR_UNIT[i], h=(L-(f.cy+y*f.R*s))*100, dx=Math.abs(x*f.R*s)*100;
+      return `<td>${nf(h,0)} cm <span class="unit">${dx<0.5?'midten':'±'+nf(dx,0)}</span></td>`; };
+    let head='<th>Krog</th>'; for(let c=0;c<cols;c++) head+=`<th>${k>1?'Stjerne '+(c+1)+(c===0?' (yderst)':''):'Højde · fra midten'}</th>`;
+    let rows=groups.map(([name,ix])=>`<tr><td>${name}${ix.length>1?' (2 stk)':''}</td>`+
+      Array.from({length:cols},(_,c)=>cell(ix[0],(k-c)/k)).join('')+'</tr>').join('');
+    rows+=`<tr class="top"><td>Midtpunkt</td><td colspan="${cols}">${nf((L-f.cy)*100,0)} cm <span class="unit">midten</span></td></tr>`;
+    document.getElementById('treeguide').innerHTML =
+      `<table class="mtable"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`;
+    document.getElementById('guidecap').textContent =
+      'Find midterlinjen på væggen og mål lodret op fra gulvet. ± = vandret afstand ud til hver side fra midterlinjen.' +
+      (k>4 ? ` Der er ${k} stjerner — de inderste følger samme mønster, mindre og mindre ind mod midtpunktet.` : '');
+  }
   function treeGuide(res){
     const wrap=document.getElementById('treewrap');
+    if(res.annotate && res.annotate.type==='star' && !res.partial){ wrap.hidden=false; return starGuide(res); }
     if(!res.annotate || res.annotate.type!=='tree' || res.partial){ wrap.hidden=true; return; }
     wrap.hidden=false;
+    document.getElementById('guidecap').textContent = TREE_CAP;
     const {r,d,W,L}=res.annotate;
     let rows=`<tr class="top"><td>⭐ Top (stjerne)</td><td>${nf(L*100,0)} cm</td><td>midten</td></tr>`;
     for(let i=1;i<=r;i++){                     // i=1 øverste række, i=r nederste
@@ -1567,7 +1626,7 @@
 
 <script>
   // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
-  const APP_VERSION = '1.8.1';
+  const APP_VERSION = '1.9.0';
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () =>
       navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));

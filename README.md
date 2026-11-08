@@ -1,6 +1,6 @@
 # Julelys-beregner
 
-Beregn og tegn ophæng af en lyskæde på loftet. Indtast rummets mål, kædens længde og antal LED, vælg et mønster (zigzag, diamant, slange eller spiral) — så tegnes plantegningen og nøgletallene (kroge, afstande, kæde brugt), inklusive hvor meget ekstra kæde nedhænget mellem krogene koster.
+Beregn og tegn ophæng af en lyskæde på loftet. Indtast rummets mål, kædens længde og antal LED, vælg et mønster (zigzag, diamant, slange eller spiral — på væggen juletræ, stjerne, zigzag eller gardin) — så tegnes plantegningen og nøgletallene (kroge, afstande, kæde brugt), inklusive hvor meget ekstra kæde nedhænget mellem krogene koster.
 
 **Åbn:** https://ebersbachdk.github.io/julelys/
 
