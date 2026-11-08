@@ -38,7 +38,7 @@ const ctx = {
 };
 vm.createContext(ctx);
 vm.runInContext(script + `
-;globalThis.__T = { S, update, calcSpiral, calcPolySpiral, calcPolyEdge, calcZig, calcSnake, calcPolyZig, calcPolySnake, sweepCells, segsCross, polyArea, polyPerim, roomCheck,
+;globalThis.__T = { S, update, calcSpiral, calcDia, calcWallZig, calcPolySpiral, calcPolyEdge, calcZig, calcSnake, calcPolyZig, calcPolySnake, sweepCells, segsCross, polyArea, polyPerim, roomCheck,
   pointInPoly, insetPoly, setWallLen, insertVertex, deleteVertex, wallLen, applyShape, CALC_POLY, isPoly };`, ctx);
 const T = ctx.__T;
 
@@ -88,8 +88,8 @@ for (const [W, L] of [[1, 4], [3, 5], [2.5, 7.3], [4, 4], [6, 12]]) {
     const a = T.calcZig(W, L, C, false), b = T.calcPolyZig(R, C, 0);
     if (!a.partial) ok(!b.partial && near(a.used, b.used, 1e-6) && a.hooks.length === b.hooks.length,
       `zig W${W} L${L} C${C}: ${a.used}/${a.hooks.length}/${a.partial} vs ${b.used}/${b.hooks.length}/${b.partial}`);
-    // for kort kæde: rektangel-tilstanden lægger hele stræk (kan overskride kæden); tegnet klipper præcis ved kæden
-    else ok(b.partial && b.used <= C + 1e-9, `zig W${W} L${L} C${C}: tegnet skal være partial og ≤ kæde`);
+    // for kort kæde: begge klipper præcis ved kædens længde
+    else ok(b.partial && near(a.used, C, 1e-9) && near(b.used, C, 1e-9), `zig W${W} L${L} C${C}: begge skal bruge præcis kæden (${a.used} / ${b.used})`);
     const c = T.calcSnake(W, L, C, false), d = T.calcPolySnake(R, C, 0);
     if (!c.partial) ok(near(c.used, d.used, 1e-6) && c.hooks.length === d.hooks.length && c.spans.length === d.spans.length,
       `slange W${W} L${L} C${C}: ${c.used}/${c.hooks.length}/${c.spans.length} vs ${d.used}/${d.hooks.length}/${d.spans.length}`);
@@ -101,6 +101,23 @@ for (const [W, L] of [[1, 4], [3, 5], [2.5, 7.3], [4, 4], [6, 12]]) {
     const c = T.calcSnake(W, L, 0, false, Math.max(1, Math.round(100 * W / P))), d = T.calcPolySnake(R, 0, P / 100);
     ok(near(c.used, d.used, 1e-6), `slange afstand W${W} L${L} P${P}: ${c.used} vs ${d.used}`);
   }
+}
+
+// Rektangel-tilstand, for kort kæde: zigzag, diamant og væg-zigzag klipper præcis ved kæden
+console.log('Rektangel: for kort kæde klippes ved kæden');
+for (const [W, L] of [[1, 4], [4, 4], [6, 12], [3, 20], [20, 3]]) for (const C of [1, 2.5, 7, 15]) for (const mid of [false, true]) {
+  const inside = pts => pts.every(([x, y]) => x >= -1e-9 && y >= -1e-9);
+  const z = T.calcZig(W, L, C, mid);
+  if (z.partial) {
+    const len = z.shapes.reduce((t, sh) => t + sh.points.slice(1).reduce((u, p, i) => u + Math.hypot(p[0] - sh.points[i][0], p[1] - sh.points[i][1]), 0), 0);
+    ok(near(z.used, C, 1e-9) && near(len, C, 1e-9), `zig W${W} L${L} C${C} mid${mid}: brugt ${z.used}, tegnet ${len}`);
+    ok(inside(z.hooks) && z.hooks.every(([x, y]) => x <= L + 1e-9 && y <= W + 1e-9), `zig W${W} L${L} C${C}: kroge uden for`);
+    ok(near(z.spans.reduce((a, b) => a + b, 0), C, 1e-9), `zig W${W} L${L} C${C}: stræk summer ikke til kæden`);
+  }
+  const d = T.calcDia(W, L, C, mid);
+  if (d.partial) ok(near(d.used, C, 1e-9) && near(d.spans.reduce((a, b) => a + b, 0), C, 1e-9), `diamant W${W} L${L} C${C}: brugt ${d.used}`);
+  const w = T.calcWallZig(W, L, C, mid);
+  if (w.partial) ok(near(w.used, C, 1e-9) && w.hooks.every(([x, y]) => x <= W + 1e-9 && y <= L + 1e-9) && inside(w.hooks), `væg-zigzag W${W} L${L} C${C}: brugt ${w.used}`);
 }
 
 // Zoner: L-rum giver 2 konvekse zoner, U giver 3, rektangel 1

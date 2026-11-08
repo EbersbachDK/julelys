@@ -447,8 +447,9 @@
     if (budget < diagMin){
       const a = Math.min(W, L);
       const segLen = Math.hypot(W, a);
-      const n = Math.max(1, Math.floor(budget / segLen));
-      return { n, a, segLen, used:n*segLen, partial:true, reach:Math.min(L,n*a) };
+      // For kort kæde: læg nok stræk til at nå ud over kæden — kalderen klipper præcis ved budget (clipPass).
+      const n = Math.max(1, Math.ceil(budget / segLen));
+      return { n, a, segLen, used:budget, budget, partial:true, reach:Math.min(L, budget/segLen*a) };
     }
     const aIdeal = (L*W)/Math.sqrt(budget*budget - L*L);
     let n = Math.max(1, Math.round(L/aIdeal));
@@ -456,6 +457,9 @@
     if (used > budget && n>1){ n--; a=L/n; segLen=Math.hypot(W,a); used=n*segLen; }
     return { n, a, segLen, used, partial:false, reach:L };
   }
+  // Klip en zigzag-sti ved kædens længde, når kæden er for kort (ellers uændret).
+  const clipPass = (pts,p)=> p.partial ? truncate(pts, p.budget).pts : pts;
+  const passSpans = (pts,mid)=>{ const s=segLens(pts); return mid ? s.flatMap(x=>[x/2,x/2]) : s; };
   const zPts = (n,a,W,startBottom)=>{ const p=[]; for(let i=0;i<=n;i++) p.push([i*a, (startBottom?(i%2===0):(i%2===1))?W:0]); return p; };
   // Afstands-mode: byg samme pass-objekt ud fra et fast antal stræk (ingen budget-grænse → aldrig partial).
   const forcedPass = (W,L,n)=>{ n=Math.max(1,Math.round(n)); const a=L/n, segLen=Math.hypot(W,a); return { n, a, segLen, used:n*segLen, partial:false, reach:L }; };
@@ -463,13 +467,12 @@
   // ---------- mønster-beregninger ----------
   function calcZig(W,L,C,mid,forceN){
     const p = forceN ? forcedPass(W,L,forceN) : computePass(W,L,C);
-    const pts = zPts(p.n,p.a,W,false);
-    let hooks=pts, spans=Array(p.n).fill(p.segLen);
-    if(mid){ hooks=pts.concat(midpoints(pts)); spans=Array(p.n*2).fill(p.segLen/2); }
+    const pts = clipPass(zPts(p.n,p.a,W,false), p);
+    const hooks = mid ? pts.concat(midpoints(pts)) : pts, spans = passSpans(pts, mid);
     return { shapes:[{points:pts,color:'var(--gold)'}], hooks, used:p.used,
       spacing:2*p.a*100, partial:p.partial, reach:p.reach, spans,
       stats:[
-        {n:nf(p.n), l:'Skrå stræk'},
+        {n:nf(pts.length-1), l:'Skrå stræk'},
         {n:nf(p.segLen,2)+'<small> m</small>', l:'Længde pr. stræk'},
         {n:nf(hooks.length), l:'Kroge i alt'+(mid?' (m. midterkrog)':'')},
         {n:nf(2*p.a*100,0)+'<small> cm</small>', l:'Afstand mellem kroge (pr. side)'},
@@ -479,16 +482,14 @@
   function calcDia(W,L,C,mid,forceN){
     const a = forceN ? forcedPass(W,L,forceN) : computePass(W,L,C/2);
     const b = forceN ? forcedPass(W,L,forceN) : computePass(W,L,C/2);
-    const pa=zPts(a.n,a.a,W,false), pb=zPts(b.n,b.a,W,true);
+    const pa=clipPass(zPts(a.n,a.a,W,false),a), pb=clipPass(zPts(b.n,b.a,W,true),b);
     const used=a.used+b.used;
-    let hooks=pa.concat(pb);
-    let spans=Array(a.n).fill(a.segLen).concat(Array(b.n).fill(b.segLen));
-    if(mid){ hooks=pa.concat(pb, midpoints(pa), midpoints(pb));
-      spans=Array(a.n*2).fill(a.segLen/2).concat(Array(b.n*2).fill(b.segLen/2)); }
+    const hooks = mid ? pa.concat(pb, midpoints(pa), midpoints(pb)) : pa.concat(pb);
+    const spans = passSpans(pa,mid).concat(passSpans(pb,mid));
     return { shapes:[{points:pa,color:'var(--gold)'},{points:pb,color:'var(--green)'}],
       hooks, used, spacing:a.a*100, partial:a.partial&&b.partial, reach:a.reach, spans,
       stats:[
-        {n:nf(a.n+b.n), l:'Skrå stræk i alt'},
+        {n:nf(pa.length+pb.length-2), l:'Skrå stræk i alt'},
         {n:nf(a.segLen,2)+'<small> m</small>', l:'Længde pr. stræk'},
         {n:nf(hooks.length), l:'Kroge i alt'+(mid?' (m. midterkrog)':'')},
         {n:nf(a.a*100,0)+'<small> cm</small>', l:'Afstand mellem kroge (pr. side)'},
@@ -593,15 +594,15 @@
   // ---------- væg: zigzag ned ad væggen ----------
   function calcWallZig(W,L,C,mid,forceN){
     const p = forceN ? forcedPass(W,L,forceN) : computePass(W,L,C);
-    const pts=[];
+    let pts=[];
     for(let i=0;i<=p.n;i++) pts.push([ (i%2===0?0:W), i*p.a ]);
-    let hooks=pts, spans=Array(p.n).fill(p.segLen);
-    if(mid){ hooks=pts.concat(midpoints(pts)); spans=Array(p.n*2).fill(p.segLen/2); }
+    pts = clipPass(pts, p);
+    const hooks = mid ? pts.concat(midpoints(pts)) : pts, spans = passSpans(pts, mid);
     return { shapes:[{points:pts,color:'var(--gold)'}], hooks, used:p.used,
       spacing:2*p.a*100, partial:p.partial, reach:p.reach, spans,
       domain:{w:W,h:L}, ground:true,
       stats:[
-        {n:nf(p.n), l:'Skrå stræk'},
+        {n:nf(pts.length-1), l:'Skrå stræk'},
         {n:nf(p.segLen,2)+'<small> m</small>', l:'Længde pr. stræk'},
         {n:nf(hooks.length), l:'Kroge i alt'+(mid?' (m. midterkrog)':'')},
         {n:nf(p.a*100,0)+'<small> cm</small>', l:'Ned pr. tak'},
@@ -1566,7 +1567,7 @@
 
 <script>
   // Version ét sted — hæv ved hver udgivelse, så service workeren henter den nye udgave.
-  const APP_VERSION = '1.8.0';
+  const APP_VERSION = '1.8.1';
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () =>
       navigator.serviceWorker.register('service-worker.js?v=' + APP_VERSION).catch(()=>{}));
